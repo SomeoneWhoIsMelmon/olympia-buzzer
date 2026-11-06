@@ -1,0 +1,10 @@
+{
+  "name": "olympia-buzzer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Realtime multiplayer quiz buzzer with host and player screens",
+  "main": "server.js",
+  "scripts": {"start": "node server.js", "dev": "node --watch server.js"},
+  "engines": {"node": ">=20"},
+  "dependencies": {"express": "^4.21.2", "socket.io": "^4.8.1"}
+}
