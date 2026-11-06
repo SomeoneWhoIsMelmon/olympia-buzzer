@@ -67,3 +67,19 @@ Không cần tự đặt PORT; Render truyền biến môi trường `PORT` và 
 ## 7. Trước khi dùng cho giải đấu thật
 
 Nên bổ sung xác thực Host bằng mã bí mật, lưu dữ liệu vào Redis/PostgreSQL, giới hạn số người/phòng, cơ chế reconnect và nhật ký sự kiện. Không chia sẻ quyền Host hoặc mã quản trị công khai. Nếu cần nhiều instance server, phải dùng Socket.IO adapter (ví dụ Redis) và kho dữ liệu dùng chung.
+
+
+### Answer Pad liên tục
+- Khi Host mở lượt, ô nhập câu trả lời được kích hoạt và tự động focus.
+- Người chơi có thể gửi nhiều câu trả lời; mỗi lần gửi được lưu thành một bản ghi riêng kèm thời gian tính từ lúc mở lượt.
+- Bấm chuông hoặc Host khóa chuông không đóng Answer Pad. Ô nhập chỉ khóa khi đồng hồ hết giờ (hoặc Host reset lượt).
+- Có thể nhấn Ctrl+Enter (Windows/Linux) hoặc Cmd+Enter (macOS) để gửi nhanh.
+- Trên một số trình duyệt điện thoại, trình duyệt có thể không tự bật bàn phím ảo nếu việc focus đến từ sự kiện mạng; người chơi có thể cần chạm một lần vào vùng nhập để bật bàn phím.
+
+
+## Điều khiển chuông và thời gian trả lời
+
+- Trong giao diện Host, đặt **Thời gian mở chuông** (mặc định 5 giây), sau đó nhấn **MỞ CHUÔNG**.
+- Bật **Chuông luôn mở** để một thí sinh bấm chuông không khóa chuông của các thí sinh khác. Khi tắt, cơ chế một người bấm đầu tiên khóa những người còn lại được giữ nguyên.
+- Đồng hồ **Thời gian trả lời** là một bộ đếm riêng. Host đặt số giây rồi nhấn **BẮT ĐẦU**; chỉ khi đồng hồ này chạy, thí sinh mới có thể gửi câu trả lời. Đồng hồ này không tự chạy khi mở chuông.
+- Host có thể tạm dừng hoặc đặt lại đồng hồ trả lời độc lập với chuông.
