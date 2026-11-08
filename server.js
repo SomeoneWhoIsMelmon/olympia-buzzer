@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,6 +11,8 @@ const PORT = process.env.PORT || 3000;
 const rooms = new Map(); // Starter version: in-memory; rooms reset when server restarts.
 
 app.use(express.static('public'));
+const buzzSoundPath = process.env.BUZZ_SOUND_PATH || path.resolve(__dirname, '..', '..', 'Olympia Stuff', 'Olympia Stuff', 'Olympia Music', 'Buzz.mp3');
+app.get('/audio/Buzz.mp3', (_req, res, next) => res.sendFile(buzzSoundPath, error => { if (error) next(error); }));
 app.get('/health', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
 
 const code = () => crypto.randomBytes(3).toString('hex').toUpperCase();
