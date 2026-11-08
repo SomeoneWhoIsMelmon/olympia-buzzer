@@ -6,10 +6,37 @@
 Đội 2</textarea></label><button class="primary wide" id="createRoom">TẠO PHÒNG</button></section>
 <section id="playerSetup" class="panel hidden"><button class="back" data-back>← Quay lại</button><h2>Tham gia trận đấu</h2><label>Mã phòng<input id="joinCode" maxlength="8" placeholder="VD: A1B2C3" autocomplete="off"></label><label>Tên người chơi<input id="playerName" maxlength="24" placeholder="Tên của bạn"></label><label>Đội<select id="playerTeam"><option value="">Đợi tải danh sách đội…</option></select></label><button class="primary wide" id="joinRoom">THAM GIA</button></section>
 <section id="hostView" class="hidden host-page">
-  <div class="topline host-topline"><div><div class="eyebrow">MÃ PHÒNG</div><div class="roomcode" id="hostCode">------</div></div><div class="host-top-actions"><button class="secondary" id="openProjector">MÁY CHIẾU</button><button class="secondary" id="copyLink">SAO CHÉP LINK</button></div></div>
+  <div class="topline host-topline"><div><div class="eyebrow">MÃ PHÒNG</div><div class="roomcode" id="hostCode">------</div></div><div class="host-top-actions"><button class="secondary" id="openProjector">MÁY CHIẾU</button><button class="secondary" id="copyLink">SAO CHÉP LINK</button><button class="secondary" id="openDatabase">DATABASE</button></div></div>
   <div class="host-layout">
-    <textarea id="hostQuestionInput" class="question-display host-question" rows="2" maxlength="500" placeholder="NHẬP CÂU HỎI"></textarea>
-    <div class="panel host-future-panel">Khoảng trống cho các tính năng sau này.</div>
+    <div class="host-question-row">
+      <textarea id="hostQuestionInput" class="question-display host-question" rows="2" maxlength="500" placeholder="NHẬP CÂU HỎI"></textarea>
+      <textarea id="hostAnswerNote" class="host-answer-note" rows="2" maxlength="5000" placeholder="ĐÁP ÁN" aria-label="Đáp án, chỉ hiển thị trên máy Host"></textarea>
+    </div>
+    <div class="panel host-future-panel">
+      <div class="opening-question-layout">
+        <div class="opening-question-settings">
+          <button class="secondary" id="startOpeningO27" type="button">KĐO27</button>
+          <div class="opening-selection-fields">
+            <label>Lượt thi<select id="spotlightRound" aria-label="Chọn lượt thi Khởi động"><option value="">Chọn lượt thi…</option></select></label>
+            <label>Thí sinh được chọn<select id="spotlightPlayer" aria-label="Chọn thí sinh để tô đỏ"><option value="">Không chọn thí sinh</option></select></label>
+            <label class="streak-option"><input id="openingStreakBonus" type="checkbox"> +20 nếu đúng 5 lần liên tiếp</label>
+          </div>
+        </div>
+        <div class="opening-question-controls">
+          <button class="secondary" id="startOpeningQuestions" type="button">60s KĐ</button>
+          <button class="secondary" id="nextOpeningQuestion" type="button" disabled>NextQuestion</button>
+          <button class="secondary" id="previousOpeningQuestion" type="button" disabled>PrevQuestion</button>
+        </div>
+        <div class="opening-answer-controls">
+          <div class="opening-audio-controls">
+            <button id="openingStartSound" type="button">START</button>
+            <button id="openingEndSound" type="button">END</button>
+          </div>
+          <button id="openingAnswerCorrect" type="button" disabled>ĐÚNG</button>
+          <button id="openingAnswerIncorrect" type="button" disabled>SAI</button>
+        </div>
+      </div>
+    </div>
     <div class="panel host-score-panel"><div class="scorehead"><h2>Bảng điểm</h2><span id="playerCount" class="muted">0 người</span></div><div id="hostPlayers" class="players"></div></div>
     <div class="panel host-controls-panel">
       <h2>ĐIỀU KHIỂN</h2>
@@ -25,6 +52,19 @@
     <div class="panel host-buzzes-panel"><div class="answerhead"><div><h2>Lịch sử bấm chuông</h2><p class="muted">Thứ tự theo thời điểm máy chủ nhận tín hiệu.</p></div><span id="buzzCount" class="muted">0 lượt</span></div><div id="hostBuzzes" class="answers"><p class="muted">Chưa có thí sinh bấm chuông.</p></div></div>
     <div class="independent-clock host-clock"><div class="independent-title"><div><h2>THỜI GIAN TRẢ LỜI</h2><p class="muted">Đồng hồ riêng cho ô trả lời của thí sinh.</p></div><strong id="hostIndependentDisplay">01:00</strong></div><div class="independent-controls"><label>Thời gian trả lời (giây)<input id="independentDuration" type="number" min="1" max="3600" value="60"></label><button class="primary" id="independentStart">BẮT ĐẦU</button><button class="secondary" id="independentPause">TẠM DỪNG</button><button class="secondary" id="independentReset">ĐẶT LẠI</button><button class="secondary answer-reveal-trigger" id="revealLatestAnswers" type="button">HIỆN ĐÁP ÁN</button></div></div>
   </div>
+</section>
+<section id="hostDatabase" class="hidden database-page">
+  <div class="database-header">
+    <div><h1>DATABASE CÂU HỎI</h1><p class="muted">Ngân hàng câu hỏi riêng của phòng này; dữ liệu chỉ tồn tại trong phiên chạy máy chủ.</p></div>
+    <button class="secondary" id="closeDatabase">QUAY LẠI HOST</button>
+  </div>
+  <div class="database-toolbar">
+    <label class="database-file-label">Nhập workbook Excel (.xlsx)<input id="databaseFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+    <button class="primary" id="importWorkbook" type="button">NHẬP SHEET KHỞI ĐỘNG</button>
+    <span id="databaseCount" class="muted" aria-live="polite">0 câu hỏi</span>
+  </div>
+  <p class="database-import-note">Chỉ nhập sheet “Khởi Động”: câu hỏi lấy từ các vùng C4:C23, C26:C45, C48:C67, C70:C89 và C92:C111; đáp án được lấy từ ô cột D cùng hàng.</p>
+  <div id="databaseQuestions" class="database-questions" aria-live="polite"></div>
 </section>
 <section id="projectorView" class="hidden projector-page">
   <button id="projectorFullscreen" class="projector-fullscreen" type="button" aria-label="Bật âm thanh và toàn màn hình">BẬT ÂM THANH / TOÀN MÀN HÌNH</button>
@@ -58,4 +98,4 @@
     <button id="closeAnswerReveal" class="primary" type="button">ĐÓNG</button>
   </div>
 </dialog>
-<div id="toast" class="toast hidden"></div><footer>Olympia Buzzer · Bản thử nghiệm mã nguồn mở</footer></main><script src="/socket.io/socket.io.js"></script><script src="/app.js"></script></body></html>
+<div id="toast" class="toast hidden"></div><footer>Olympia Buzzer · Bản thử nghiệm mã nguồn mở</footer></main><script src="/socket.io/socket.io.js"></script><script src="/excel-import.js"></script><script src="/app.js"></script></body></html>

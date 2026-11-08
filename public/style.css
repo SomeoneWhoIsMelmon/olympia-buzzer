@@ -241,3 +241,60 @@ body,body.player-active{background:#000040;}
  .host-active .host-future-panel{min-height:100px;}
  .host-active .host-round-settings{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);}
 }
+.host-active .database-page{width:100%;max-width:1600px;min-height:0;flex:1;display:flex;flex-direction:column;gap:12px;margin:0 auto;color:#fff;}
+.host-active .database-header,.host-active .database-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:2px solid #fff;background:#000040;}
+.database-header h1{margin:0;font-size:clamp(20px,2.4vw,30px);}
+.database-header p{margin:5px 0 0;}
+.host-active .database-header button,.host-active .database-toolbar button{border:2px solid #fff;border-radius:0;background:#000040;color:#fff;}
+.database-toolbar{flex-wrap:wrap;}
+.database-import-note{margin:0;color:#fff;font-size:12px;}
+.database-toolbar .database-file-label{flex:1 1 260px;margin:0;color:#fff;}
+.database-toolbar input[type=file]{padding:8px;background:#000040;color:#fff;}
+.database-questions{flex:1;min-height:0;overflow:auto;display:grid;align-content:start;gap:10px;}
+.database-table{width:100%;min-width:800px;table-layout:fixed;border:4px solid #fff;border-spacing:8px;background:#000040;}
+.database-table th{padding:0 4px;color:#fff;font-size:clamp(17px,2vw,25px);font-style:italic;text-align:left;}
+.database-table th:nth-child(1){width:17%;}
+.database-table th:nth-child(2){width:57%;}
+.database-table th:nth-child(3){width:26%;}
+.database-table td{padding:7px;border:4px solid #fff;vertical-align:top;}
+.database-round-cell input,.database-prompt-cell textarea,.database-answer-cell textarea{width:100%;min-width:0;margin:0;border:1px solid #fff;border-radius:0;background:#000040;color:#fff;}
+.database-round-cell input{margin-bottom:8px;}
+.database-prompt-cell textarea,.database-answer-cell textarea{height:35px;min-height:35px;padding:4px 8px;line-height:1.2;resize:vertical;}
+.database-round-cell button{width:100%;border:2px solid #fff;border-radius:0;background:#000040;color:#fff;}
+@media(max-width:800px){
+ .host-active .database-page{flex:none;}
+ .host-active .database-header{align-items:flex-start;}
+ .database-questions{flex:none;max-height:70vh;overflow:auto;}
+}
+.host-active .host-question-row{grid-area:question;display:grid;grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:clamp(8px,1vw,14px);min-width:0;min-height:0;height:100%;}
+.host-active .host-question-row .host-question{grid-area:auto;width:100%;height:100%;min-height:0;margin:0;}
+.host-active .host-answer-note{width:100%;height:100%;min-height:0;margin:0;padding:12px;border:3px solid #fff;border-radius:0;background:#000040;color:#fff;text-align:center;resize:none;font-size:clamp(16px,2vw,24px);font-weight:400;line-height:1.3;}
+.host-active .host-answer-note::placeholder{color:#fff;opacity:1;}
+@media(max-width:650px){
+ .host-active .host-question-row{height:100px;min-height:100px;}
+ .host-active .host-future-panel{height:132px;min-height:132px;}
+}
+.host-active .host-future-panel{display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:4px;text-align:left;}
+.host-active .host-future-panel h2{margin:0;color:#fff;text-align:center;font-size:clamp(13px,1.3vw,18px);}
+.opening-question-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);align-items:stretch;gap:4px;min-width:0;min-height:0;height:100%;flex:1;}
+.opening-question-settings{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,2fr);align-content:stretch;gap:5px;min-width:0;min-height:0;height:100%;}
+.opening-question-settings label{width:100%;max-width:100%;}
+.opening-question-settings>#startOpeningO27{width:100%;height:100%;min-width:0;min-height:0;padding:3px 4px;border:1px solid #fff;border-radius:0;background:#000040;color:#fff;font-size:clamp(8px,.75vw,10px);letter-spacing:0;}
+.opening-selection-fields{display:grid;grid-template-rows:repeat(3,minmax(0,1fr));align-content:stretch;gap:3px;min-width:0;min-height:0;}
+.host-active .host-future-panel label{min-width:0;margin:0;color:#fff;font-size:clamp(9px,.8vw,11px);}
+.host-active .host-future-panel .streak-option{display:flex;align-items:center;gap:4px;font-size:clamp(8px,.72vw,10px);line-height:1.05;}
+.host-active .host-future-panel .streak-option input{display:inline-block;flex:none;width:12px;height:12px;margin:0;padding:0;accent-color:#00ff00;}
+.host-active .host-future-panel select{min-width:0;height:22px;margin:1px 0 0;padding:2px 5px;border:1px solid #fff;border-radius:0;background:#000040;color:#fff;font-size:clamp(10px,.85vw,12px);}
+.opening-question-controls{display:grid;grid-template-rows:repeat(3,minmax(0,1fr));gap:3px;min-width:0;}
+.opening-question-controls button{width:100%;height:100%;min-width:0;min-height:0;padding:3px 2px;border:1px solid #fff;border-radius:0;background:#000040;color:#fff;font-size:clamp(8px,.8vw,11px);letter-spacing:0;line-height:1.05;white-space:normal;overflow-wrap:anywhere;}
+.opening-answer-controls{display:grid;grid-template-rows:repeat(3,minmax(0,1fr));gap:5px;}
+.opening-answer-controls button{width:100%;height:100%;min-width:0;padding:3px;border:1px solid #fff;border-radius:0;font-size:clamp(11px,1.1vw,15px);font-weight:900;letter-spacing:0;}
+.opening-audio-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;min-width:0;min-height:0;}
+.opening-audio-controls button{min-width:0;padding:2px;font-size:clamp(9px,.9vw,12px);}
+.opening-audio-controls #openingStartSound{background:#008000;color:#fff;}
+.opening-audio-controls #openingEndSound{background:#800000;color:#fff;}
+.opening-answer-controls #openingAnswerCorrect{background:rgb(0,255,0);color:#000;}
+.opening-answer-controls #openingAnswerIncorrect{background:rgb(255,0,0);color:#fff;}
+.opening-answer-controls button:disabled{opacity:.35;filter:grayscale(1);}
+.host-active .host-score-panel .playerrow.spotlight-player,.player-active .player-score-panel .playerrow.spotlight-player,.projector-player.spotlight-player{background:#e00000!important;border-color:#ff4d4d!important;color:#fff!important;}
+.host-active .host-score-panel .playerrow.spotlight-player .playername,.host-active .host-score-panel .playerrow.spotlight-player .playerteam,.host-active .host-score-panel .playerrow.spotlight-player .points{color:#fff!important;}
