@@ -15,7 +15,10 @@
     <div class="panel host-future-panel">
       <div class="opening-question-layout">
         <div class="opening-question-settings">
-          <button class="secondary" id="startOpeningO27" type="button">KĐO27</button>
+          <div class="opening-mode-buttons">
+            <button class="secondary" id="startFiveSecondTimer" type="button">5s (Z)</button>
+            <button class="secondary" id="startOpeningO27" type="button">KĐO27</button>
+          </div>
           <div class="opening-selection-fields">
             <label>Lượt thi<select id="spotlightRound" aria-label="Chọn lượt thi Khởi động"><option value="">Chọn lượt thi…</option></select></label>
             <label>Thí sinh được chọn<select id="spotlightPlayer" aria-label="Chọn thí sinh để tô đỏ"><option value="">Không chọn thí sinh</option></select></label>
@@ -24,16 +27,16 @@
         </div>
         <div class="opening-question-controls">
           <button class="secondary" id="startOpeningQuestions" type="button">60s KĐ</button>
-          <button class="secondary" id="nextOpeningQuestion" type="button" disabled>NextQuestion</button>
-          <button class="secondary" id="previousOpeningQuestion" type="button" disabled>PrevQuestion</button>
+          <button class="secondary" id="nextOpeningQuestion" type="button" disabled>NextQuestion (→)</button>
+          <button class="secondary" id="previousOpeningQuestion" type="button" disabled>PrevQuestion (←)</button>
         </div>
         <div class="opening-answer-controls">
           <div class="opening-audio-controls">
             <button id="openingStartSound" type="button">START</button>
             <button id="openingEndSound" type="button">END</button>
           </div>
-          <button id="openingAnswerCorrect" type="button" disabled>ĐÚNG</button>
-          <button id="openingAnswerIncorrect" type="button" disabled>SAI</button>
+          <button id="openingAnswerCorrect" type="button" disabled>ĐÚNG (↑)</button>
+          <button id="openingAnswerIncorrect" type="button" disabled>SAI (↓)</button>
         </div>
       </div>
     </div>
@@ -46,7 +49,7 @@
         <label class="buzzer-duration">Thời gian mở chuông (giây)<input id="duration" type="number" min="1" max="300" value="5"></label>
         <label class="toggleline"><input id="alwaysOpen" type="checkbox"> Chuông luôn mở <small class="muted">(một người bấm không khóa chuông của người khác)</small></label>
       </div>
-      <div class="controls"><button class="primary" id="startRound">MỞ CHUÔNG</button><button class="secondary" id="lockRound">KHÓA</button><button class="secondary" id="resetRound">RESET</button></div>
+      <div class="controls"><button class="primary" id="startRound">MỞ CHUÔNG</button><button class="secondary" id="startRoundDelayed">MỞ CHUÔNG SAU 5S</button><button class="secondary" id="lockRound">KHÓA</button><button class="secondary" id="resetRound">RESET</button></div>
     </div>
     <div class="panel host-answers-panel"><div class="answerhead"><div><h2>Câu trả lời mới nhất của mỗi thí sinh</h2><p class="muted">Thời gian tính từ lúc Host mở lượt.</p></div><span id="answerCount" class="muted">0 câu trả lời</span></div><div id="hostAnswers" class="answers"><p class="muted">Chưa có câu trả lời.</p></div></div>
     <div class="panel host-buzzes-panel"><div class="answerhead"><div><h2>Lịch sử bấm chuông</h2><p class="muted">Thứ tự theo thời điểm máy chủ nhận tín hiệu.</p></div><span id="buzzCount" class="muted">0 lượt</span></div><div id="hostBuzzes" class="answers"><p class="muted">Chưa có thí sinh bấm chuông.</p></div></div>

@@ -17,10 +17,10 @@ const clean = (s, max = 24) => String(s || '').trim().replace(/[<>]/g, '').slice
 function publicRoom(room) {
   return {
     code: room.code, status: room.status, duration: room.duration, question: room.question || '',
-    deadline: room.deadline, buzzerAlwaysOpen: room.buzzerAlwaysOpen, winnerId: room.winnerId, buzzes: room.buzzes || [],
+    deadline: room.deadline, openingDeadline: room.openingDeadline || null, buzzerCountdownDeadline: room.buzzerCountdownDeadline || null, winnerCountdownDeadline: room.winnerCountdownDeadline || null, buzzerAlwaysOpen: room.buzzerAlwaysOpen, winnerId: room.winnerId, buzzes: room.buzzes || [],
     spotlightRound: room.spotlightRound || '', spotlightPlayerId: room.spotlightPlayerId || null,
     openingQuestionRound: room.openingQuestionRound || '', openingQuestionIndex: Number.isInteger(room.openingQuestionIndex) ? room.openingQuestionIndex : null,
-    openingQuestionMode: room.openingQuestionMode || '', openingEmptyQuestionNumber: Number.isInteger(room.openingEmptyQuestionNumber) ? room.openingEmptyQuestionNumber : null,
+    openingQuestionMode: room.openingQuestionMode || '', openingStartArmed: Boolean(room.openingStartArmed), openingEmptyQuestionNumber: Number.isInteger(room.openingEmptyQuestionNumber) ? room.openingEmptyQuestionNumber : null,
     players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, team: p.team, score: p.score, connected: p.connected, focused: p.focused !== false, buzzedAt: p.buzzedAt, answerSubmitted: Boolean(p.answerSubmitted), latestAnswer: p.latestAnswer || null })),
     teams: room.teams, answerCount: room.answers.length, independentTimer: { duration: room.independentTimer.duration, running: room.independentTimer.running, deadline: room.independentTimer.deadline, remainingMs: room.independentTimer.running && room.independentTimer.deadline ? Math.max(0, room.independentTimer.deadline - Date.now()) : room.independentTimer.remainingMs, startedAt: room.independentTimer.startedAt }
   };
@@ -28,6 +28,79 @@ function publicRoom(room) {
 function emitRoom(room) { io.to(room.code).emit('room:update', publicRoom(room)); }
 function emitHostAnswers(room) { if (room.hostId) io.to(room.hostId).emit('answers:update', room.answers); }
 function stopTimer(room) { if (room.timer) clearTimeout(room.timer); room.timer = null; }
+function stopOpeningTimer(room) {
+  if (room.openingTimer) clearTimeout(room.openingTimer);
+  room.openingTimer = null;
+  room.openingDeadline = null;
+  room.openingTimerKind = null;
+}
+function stopBuzzerCountdown(room) {
+  if (room.buzzerCountdownTimer) clearTimeout(room.buzzerCountdownTimer);
+  room.buzzerCountdownTimer = null;
+  room.buzzerCountdownDeadline = null;
+}
+function stopWinnerCountdown(room) {
+  if (room.winnerCountdownTimer) clearTimeout(room.winnerCountdownTimer);
+  room.winnerCountdownTimer = null;
+  room.winnerCountdownDeadline = null;
+}
+function startWinnerCountdown(room) {
+  stopWinnerCountdown(room);
+  const deadline = Date.now() + 5000;
+  room.winnerCountdownDeadline = deadline;
+  room.winnerCountdownTimer = setTimeout(() => {
+    if (room.winnerCountdownDeadline !== deadline) return;
+    room.winnerCountdownTimer = null;
+    room.winnerCountdownDeadline = null;
+    emitRoom(room);
+  }, 6000);
+}
+function startBuzzerRound(room, duration, preserveOpening = false) {
+  stopBuzzerCountdown(room);
+  stopWinnerCountdown(room);
+  stopTimer(room);
+  if (!preserveOpening) {
+    stopOpeningTimer(room);
+    room.openingQuestionRound = ''; room.openingQuestionIndex = null; room.openingQuestionMode = ''; room.openingEmptyQuestionNumber = null;
+    room.openingStartArmed = false;
+  }
+  room.duration = Math.max(1, Math.min(300, Number(duration) || room.duration || 5));
+  room.winnerId = null; room.answers = []; room.buzzes = []; room.roundStartedAt = Date.now();
+  for (const player of room.players.values()) { player.buzzedAt = null; player.answerSubmitted = false; player.latestAnswer = null; }
+  room.status = 'playing'; room.deadline = Date.now() + room.duration * 1000;
+  room.timer = setTimeout(() => {
+    if (room.deadline && Date.now() >= room.deadline && ['playing', 'won'].includes(room.status)) {
+      room.status = 'locked'; room.deadline = null; room.timer = null; emitRoom(room);
+    }
+  }, room.duration * 1000);
+  emitRoom(room);
+  emitHostAnswers(room);
+}
+function startDelayedBuzzer(room, duration, preserveOpening = false) {
+  stopTimer(room);
+  stopBuzzerCountdown(room);
+  stopWinnerCountdown(room);
+  if (!preserveOpening) {
+    stopOpeningTimer(room);
+    room.openingQuestionRound = ''; room.openingQuestionIndex = null; room.openingQuestionMode = ''; room.openingEmptyQuestionNumber = null;
+    room.openingStartArmed = false;
+  }
+  room.status = 'locked';
+  room.deadline = null;
+  room.winnerId = null;
+  room.buzzes = [];
+  if (preserveOpening) room.spotlightPlayerId = null;
+  for (const player of room.players.values()) player.buzzedAt = null;
+  room.duration = Math.max(1, Math.min(300, Number(duration) || room.duration || 5));
+  const countdownDeadline = Date.now() + 5000;
+  room.buzzerCountdownDeadline = countdownDeadline;
+  room.buzzerCountdownTimer = setTimeout(() => {
+    if (room.buzzerCountdownDeadline !== countdownDeadline) return;
+    room.buzzerCountdownTimer = null;
+    startBuzzerRound(room, room.duration, preserveOpening);
+  }, 5000);
+  emitRoom(room);
+}
 function lockRoom(room, status = 'locked') { stopTimer(room); room.status = status; room.deadline = null; }
 function finishRound(room, status) { lockRoom(room, status); emitRoom(room); }
 
@@ -52,7 +125,7 @@ io.on('connection', socket => {
       duration: Math.max(1, Math.min(300, Number(duration) || 5)),
       buzzerAlwaysOpen: false,
       teams: Array.isArray(teams) ? teams.slice(0, 12).map(t => clean(t, 20)).filter(Boolean) : ['Đội 1', 'Đội 2'],
-      players: new Map(), answers: [], buzzes: [], questions: [], spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingEmptyQuestionNumber: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, running: false, startedAt: null, handle: null }
+      players: new Map(), answers: [], buzzes: [], questions: [], spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingStartArmed: false, openingEmptyQuestionNumber: null, openingDeadline: null, openingTimer: null, openingTimerKind: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, buzzerCountdownDeadline: null, buzzerCountdownTimer: null, winnerCountdownDeadline: null, winnerCountdownTimer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, running: false, startedAt: null, handle: null }
     };
     if (!room.teams.length) room.teams = ['Đội 1', 'Đội 2'];
     rooms.set(roomCode, room); socket.join(roomCode);
@@ -116,37 +189,49 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'player') return ack({ ok: false, error: 'Không tìm thấy phòng.' });
     const player = room.players.get(socket.id);
-    if (!player || room.status !== 'playing' || (room.deadline && Date.now() >= room.deadline)) return ack({ ok: false, error: 'Chuông hiện không mở.' });
+    if (!player || room.status !== 'playing' || !room.deadline || Date.now() >= room.deadline) return ack({ ok: false, error: 'Chuông hiện không mở.' });
     if (room.buzzerAlwaysOpen) {
       // In always-open mode, each player may buzz only once per round.
       if (player.buzzedAt) return ack({ ok: false, error: 'Bạn đã bấm chuông rồi.' });
       const receivedAt = Date.now();
       player.buzzedAt = receivedAt;
       const buzz = { id: crypto.randomUUID(), playerId: player.id, name: player.name, team: player.team, receivedAt, elapsedMs: Math.max(0, receivedAt - (room.roundStartedAt || receivedAt)) };
+      const isFirstBuzz = room.buzzes.length === 0;
       room.buzzes.push(buzz);
+      if (isFirstBuzz) startWinnerCountdown(room);
+      if (isFirstBuzz && room.openingStartArmed && room.openingQuestionRound === 'Lượt chung') room.spotlightPlayerId = player.id;
       emitRoom(room); ack({ ok: true, alwaysOpen: true, elapsedMs: buzz.elapsedMs }); return;
     }
     if (room.winnerId) return ack({ ok: false, error: 'Đã có người bấm trước.' });
     room.winnerId = player.id; player.buzzedAt = Date.now();
+    startWinnerCountdown(room);
+    if (room.openingStartArmed && room.openingQuestionRound === 'Lượt chung') room.spotlightPlayerId = player.id;
     room.status = 'won'; emitRoom(room); ack({ ok: true });
   });
 
   socket.on('host:start', ({ duration } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
-    stopTimer(room); room.openingQuestionRound = ''; room.openingQuestionIndex = null; room.openingQuestionMode = ''; room.openingEmptyQuestionNumber = null; room.duration = Math.max(1, Math.min(300, Number(duration) || room.duration || 5)); room.winnerId = null; room.answers = []; room.buzzes = []; room.roundStartedAt = Date.now();
-    for (const p of room.players.values()) { p.buzzedAt = null; p.answerSubmitted = false; p.latestAnswer = null; }
-    room.status = 'playing'; room.deadline = Date.now() + room.duration * 1000;
-    room.timer = setTimeout(() => {
-      if (room.deadline && Date.now() >= room.deadline && ['playing','won'].includes(room.status)) {
-        room.status = 'locked'; room.deadline = null; room.timer = null; emitRoom(room);
-      }
-    }, room.duration * 1000);
-    emitRoom(room); emitHostAnswers(room); ack({ ok: true });
-  });  socket.on('host:lock', (_payload, ack = () => {}) => {
+    startBuzzerRound(room, duration);
+    ack({ ok: true });
+  });
+  socket.on('host:start:delayed', ({ duration } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
+    const preserveOpening = room.openingStartArmed && room.openingQuestionRound === 'Lượt chung';
+    startDelayedBuzzer(room, duration, preserveOpening);
+    const countdownDeadline = room.buzzerCountdownDeadline;
+    ack({ ok: true, buzzerCountdownDeadline: countdownDeadline });
+  });
+  socket.on('host:lock', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
     // Host locks only the buzzer; answer submissions remain open until the countdown ends.
+    stopBuzzerCountdown(room);
+    if (!(room.openingStartArmed && room.openingQuestionRound === 'Lượt chung') && room.openingTimer) {
+      clearTimeout(room.openingTimer);
+      room.openingTimer = null;
+    }
     if (room.status === 'playing') room.status = 'locked';
     stopTimer(room); room.deadline = null;
     emitRoom(room); ack({ ok: true });
@@ -155,6 +240,7 @@ io.on('connection', socket => {
   socket.on('host:question', ({ question, resetBuzzer } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (resetBuzzer) stopBuzzerCountdown(room);
     room.question = String(question || '').trim().slice(0, 500);
     room.openingQuestionRound = ''; room.openingQuestionIndex = null; room.openingQuestionMode = ''; room.openingEmptyQuestionNumber = null;
     if (resetBuzzer) {
@@ -169,7 +255,7 @@ io.on('connection', socket => {
     emitRoom(room);
     ack({ ok: true });
   });
-  socket.on('host:opening:start', ({ round, mode } = {}, ack = () => {}) => {
+  socket.on('host:opening:start', ({ round, mode, duration } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     const selectedRound = String(round || '').trim();
@@ -185,36 +271,68 @@ io.on('connection', socket => {
       return !question || !String(question.prompt || '').trim();
     });
     const emptyQuestionNumber = firstMissing || 21;
+    stopBuzzerCountdown(room);
     stopTimer(room);
+    stopWinnerCountdown(room);
+    stopOpeningTimer(room);
     room.roundStartedAt = Date.now();
     room.winnerId = null;
     room.buzzes = [];
+    if (room.openingStartArmed && selectedRound === 'Lượt chung') room.spotlightPlayerId = null;
     for (const player of room.players.values()) player.buzzedAt = null;
     room.openingQuestionRound = selectedRound;
     room.openingQuestionIndex = 0;
     room.openingQuestionMode = mode;
     room.openingEmptyQuestionNumber = emptyQuestionNumber;
+    room.openingStartArmed = room.openingStartArmed && selectedRound === 'Lượt chung';
     room.question = questions[0].prompt;
     room.status = 'locked';
+    room.deadline = null;
     if (mode === 'standard') {
-      room.duration = 60;
       const deadline = Date.now() + 60000;
-      room.deadline = deadline;
-      room.timer = setTimeout(() => {
-        if (room.deadline === deadline && room.openingQuestionRound === selectedRound) {
-          room.deadline = Date.now();
-          room.timer = null;
+      room.openingDeadline = deadline;
+      room.openingTimerKind = 'round';
+      room.openingTimer = setTimeout(() => {
+        if (room.openingDeadline === deadline && room.openingQuestionRound === selectedRound) {
+          room.openingDeadline = null;
+          room.openingTimer = null;
+          room.openingTimerKind = null;
+          if (room.status === 'playing' || room.status === 'won') {
+            stopTimer(room);
+            room.status = 'locked';
+            room.deadline = null;
+          }
+          stopBuzzerCountdown(room);
           emitRoom(room);
         }
       }, 60000);
     } else {
-      room.deadline = null;
-      room.timer = null;
+      room.openingDeadline = null;
+      room.openingTimer = null;
+      room.openingTimerKind = null;
     }
-    emitRoom(room);
+    if (room.openingStartArmed && selectedRound === 'Lượt chung') startDelayedBuzzer(room, duration, true);
+    else emitRoom(room);
     ack({ ok: true, answer: questions[0].answer, emptyQuestionNumber });
   });
-  socket.on('host:opening:navigate', ({ round, direction } = {}, ack = () => {}) => {
+  socket.on('host:opening:timer', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    stopOpeningTimer(room);
+    const deadline = Date.now() + 5000;
+    room.openingDeadline = deadline;
+    room.openingTimerKind = 'standalone';
+    room.openingTimer = setTimeout(() => {
+      if (room.openingDeadline !== deadline || room.openingTimerKind !== 'standalone') return;
+      room.openingDeadline = null;
+      room.openingTimer = null;
+      room.openingTimerKind = null;
+      emitRoom(room);
+    }, 6000);
+    emitRoom(room);
+    ack({ ok: true, openingDeadline: deadline });
+  });
+  socket.on('host:opening:navigate', ({ round, direction, duration } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (direction !== 'next' && direction !== 'previous') return ack({ ok: false, error: 'Hướng chuyển câu không hợp lệ.' });
@@ -227,7 +345,8 @@ io.on('connection', socket => {
     if (nextIndex < 0 || nextIndex >= questions.length) return ack({ ok: false, error: direction === 'next' ? 'Đã đến câu cuối của lượt thi.' : 'Đây là câu đầu tiên của lượt thi.' });
     room.openingQuestionIndex = nextIndex;
     room.question = questions[nextIndex].prompt;
-    emitRoom(room);
+    if (room.openingStartArmed && selectedRound === 'Lượt chung') startDelayedBuzzer(room, duration, true);
+    else emitRoom(room);
     ack({ ok: true, answer: questions[nextIndex].answer });
   });
   socket.on('host:opening:judge', ({ playerId, result, points } = {}, ack = () => {}) => {
@@ -236,9 +355,15 @@ io.on('connection', socket => {
     if (result !== 'correct' && result !== 'wrong') return ack({ ok: false, error: 'Kết quả chấm không hợp lệ.' });
     const player = typeof playerId === 'string' ? room.players.get(playerId) : null;
     if (!player) return ack({ ok: false, error: 'Không tìm thấy thí sinh được chọn.' });
+    const commonRound = room.openingStartArmed && room.openingQuestionRound === 'Lượt chung';
     if (result === 'correct') {
+      if (commonRound && points !== 10) return ack({ ok: false, error: 'Lượt chung chỉ cộng 10 điểm khi trả lời đúng.' });
       if (points !== 10 && points !== 30) return ack({ ok: false, error: 'Số điểm cộng không hợp lệ.' });
       player.score = Math.max(-9999, Math.min(9999, player.score + points));
+      emitRoom(room);
+    } else if (commonRound) {
+      if (points !== undefined) return ack({ ok: false, error: 'Điểm trừ cho câu trả lời sai không hợp lệ.' });
+      player.score = Math.max(-9999, player.score - 5);
       emitRoom(room);
     } else if (points !== undefined) {
       return ack({ ok: false, error: 'Câu trả lời sai không thay đổi điểm.' });
@@ -250,9 +375,23 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (!['start', 'end', 'opening'].includes(type)) return ack({ ok: false, error: 'Lệnh âm thanh không hợp lệ.' });
+    if (type === 'start') {
+      room.openingStartArmed = room.spotlightRound === 'Lượt chung';
+      emitRoom(room);
+    }
     if (type === 'end') {
+      stopBuzzerCountdown(room);
+      stopWinnerCountdown(room);
       stopTimer(room);
+      stopOpeningTimer(room);
+      room.status = 'locked';
       room.deadline = null;
+      room.winnerId = null;
+      room.buzzes = [];
+      room.roundStartedAt = null;
+      room.spotlightPlayerId = null;
+      for (const player of room.players.values()) player.buzzedAt = null;
+      room.openingStartArmed = false;
       room.openingQuestionRound = '';
       room.openingQuestionIndex = null;
       room.openingQuestionMode = '';
@@ -275,13 +414,14 @@ io.on('connection', socket => {
     if (selectedPlayerId && !room.players.has(selectedPlayerId)) return ack({ ok: false, error: 'Không tìm thấy thí sinh được chọn.' });
     room.spotlightRound = selectedRound;
     room.spotlightPlayerId = selectedPlayerId || null;
+    if (selectedRound !== 'Lượt chung') room.openingStartArmed = false;
     emitRoom(room);
     ack({ ok: true });
   });
   socket.on('host:reset', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
-    stopTimer(room); stopIndependentTimer(room, false); room.independentTimer.remainingMs = room.independentTimer.duration * 1000; room.independentTimer.startedAt = null; room.independentTimer.startedAt = null; room.status = 'waiting'; room.deadline = null; room.openingQuestionRound = ''; room.openingQuestionIndex = null; room.openingQuestionMode = ''; room.openingEmptyQuestionNumber = null; room.winnerId = null; room.roundStartedAt = null; room.answers = []; room.buzzes = [];
+    stopBuzzerCountdown(room); stopWinnerCountdown(room); stopTimer(room); stopOpeningTimer(room); stopIndependentTimer(room, false); room.independentTimer.remainingMs = room.independentTimer.duration * 1000; room.independentTimer.startedAt = null; room.independentTimer.startedAt = null; room.status = 'waiting'; room.deadline = null; room.openingQuestionRound = ''; room.openingQuestionIndex = null; room.openingQuestionMode = ''; room.openingStartArmed = false; room.openingEmptyQuestionNumber = null; room.winnerId = null; room.roundStartedAt = null; room.answers = []; room.buzzes = [];
     for (const p of room.players.values()) { p.buzzedAt = null; p.answerSubmitted = false; p.latestAnswer = null; }
     emitRoom(room); emitHostAnswers(room); ack({ ok: true });
   });
@@ -298,6 +438,7 @@ io.on('connection', socket => {
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     const enabled = Boolean(alwaysOpen);
     if (room.buzzerAlwaysOpen !== enabled) {
+      stopWinnerCountdown(room);
       room.buzzes = [];
       for (const player of room.players.values()) player.buzzedAt = null;
     }
