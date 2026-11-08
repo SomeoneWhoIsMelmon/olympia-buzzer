@@ -18,7 +18,7 @@ function publicRoom(room) {
   return {
     code: room.code, status: room.status, duration: room.duration, question: room.question || '',
     deadline: room.deadline, buzzerAlwaysOpen: room.buzzerAlwaysOpen, winnerId: room.winnerId, buzzes: room.buzzes || [],
-    players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, team: p.team, score: p.score, connected: p.connected, buzzedAt: p.buzzedAt, answerSubmitted: Boolean(p.answerSubmitted), latestAnswer: p.latestAnswer || null })),
+    players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, team: p.team, score: p.score, connected: p.connected, focused: p.focused !== false, buzzedAt: p.buzzedAt, answerSubmitted: Boolean(p.answerSubmitted), latestAnswer: p.latestAnswer || null })),
     teams: room.teams, answerCount: room.answers.length, independentTimer: { duration: room.independentTimer.duration, running: room.independentTimer.running, deadline: room.independentTimer.deadline, remainingMs: room.independentTimer.running && room.independentTimer.deadline ? Math.max(0, room.independentTimer.deadline - Date.now()) : room.independentTimer.remainingMs, startedAt: room.independentTimer.startedAt }
   };
 }
@@ -33,6 +33,14 @@ io.on('connection', socket => {
     const room = rooms.get(clean(rawCode, 8).toUpperCase());
     if (!room) return ack({ ok: false, error: 'Không tìm thấy phòng.' });
     ack({ ok: true, teams: room.teams });
+  });
+  socket.on('projector:join', ({ code: rawCode } = {}, ack = () => {}) => {
+    const room = rooms.get(clean(rawCode, 8).toUpperCase());
+    if (!room) return ack({ ok: false, error: 'Không tìm thấy phòng.' });
+    socket.join(room.code);
+    socket.data.roomCode = room.code;
+    socket.data.role = 'projector';
+    ack({ ok: true, state: publicRoom(room) });
   });
   socket.on('host:create', ({ hostName, duration, teams } = {}, ack = () => {}) => {
     let roomCode; do { roomCode = code(); } while (rooms.has(roomCode));
@@ -65,7 +73,7 @@ io.on('connection', socket => {
     const playerName = clean(name, 24);
     if (!playerName) return ack({ ok: false, error: 'Bạn cần nhập tên.' });
     const chosenTeam = room.teams.includes(team) ? team : room.teams[0];
-    const player = { id: socket.id, name: playerName, team: chosenTeam, score: 0, connected: true, buzzedAt: null, answerSubmitted: false, latestAnswer: null };
+    const player = { id: socket.id, name: playerName, team: chosenTeam, score: 0, connected: true, focused: true, buzzedAt: null, answerSubmitted: false, latestAnswer: null };
     room.players.set(socket.id, player); socket.join(room.code);
     socket.data.roomCode = room.code; socket.data.role = 'player';
     ack({ ok: true, playerId: socket.id, state: publicRoom(room) }); emitRoom(room);
@@ -90,6 +98,15 @@ io.on('connection', socket => {
     emitRoom(room);
     emitHostAnswers(room);
     ack({ ok: true, elapsedMs });
+  });
+
+  socket.on('player:focus', ({ focused } = {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || socket.data.role !== 'player' || typeof focused !== 'boolean') return;
+    const player = room.players.get(socket.id);
+    if (!player || player.focused === focused) return;
+    player.focused = focused;
+    emitRoom(room);
   });
 
   socket.on('player:buzz', (_payload, ack = () => {}) => {
@@ -132,10 +149,19 @@ io.on('connection', socket => {
     emitRoom(room); ack({ ok: true });
   });
 
-  socket.on('host:question', ({ question } = {}, ack = () => {}) => {
+  socket.on('host:question', ({ question, resetBuzzer } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
     room.question = String(question || '').trim().slice(0, 500);
+    if (resetBuzzer) {
+      room.winnerId = null;
+      room.buzzes = [];
+      for (const player of room.players.values()) player.buzzedAt = null;
+      if (room.status === 'won') {
+        if (room.deadline && Date.now() < room.deadline) room.status = 'playing';
+        else lockRoom(room);
+      }
+    }
     emitRoom(room);
     ack({ ok: true });
   });
@@ -157,7 +183,12 @@ io.on('connection', socket => {
   socket.on('host:buzzer-mode', ({ alwaysOpen } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
-    room.buzzerAlwaysOpen = Boolean(alwaysOpen);
+    const enabled = Boolean(alwaysOpen);
+    if (room.buzzerAlwaysOpen !== enabled) {
+      room.buzzes = [];
+      for (const player of room.players.values()) player.buzzedAt = null;
+    }
+    room.buzzerAlwaysOpen = enabled;
     emitRoom(room); ack({ ok: true });
   });
   socket.on('host:independent:set', ({ duration } = {}, ack = () => {}) => {
@@ -191,13 +222,28 @@ io.on('connection', socket => {
     stopIndependentTimer(room, false); room.independentTimer.remainingMs = room.independentTimer.duration * 1000; room.independentTimer.startedAt = null;
     emitRoom(room); ack({ ok: true });
   });
-
+  socket.on('host:answer:reveal', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    const answers = [...room.players.values()]
+      .filter(player => player.latestAnswer)
+      .map(player => ({
+        name: player.name,
+        team: player.team,
+        answer: player.latestAnswer.answer,
+        elapsedMs: player.latestAnswer.elapsedMs,
+        submittedAt: player.latestAnswer.submittedAt
+      }))
+      .sort((a, b) => a.elapsedMs - b.elapsedMs || a.submittedAt - b.submittedAt);
+    io.to(room.code).emit('player:answer:reveal', { answers });
+    ack({ ok: true, count: answers.length });
+  });
   socket.on('host:score', ({ playerId, delta } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
     const p = room.players.get(playerId);
     if (!p) return ack({ ok: false, error: 'Không tìm thấy người chơi.' });
-    p.score = Math.max(0, Math.min(9999, p.score + Math.max(-100, Math.min(1000, Number(delta) || 0))));
+    p.score = Math.max(-9999, Math.min(9999, p.score + Math.max(-100, Math.min(1000, Number(delta) || 0))));
     emitRoom(room); ack({ ok: true });
   });
   socket.on('host:remove', ({ playerId } = {}, ack = () => {}) => {
@@ -210,7 +256,7 @@ io.on('connection', socket => {
   socket.on('disconnect', () => {
     const room = rooms.get(socket.data.roomCode); if (!room) return;
     if (socket.data.role === 'player') {
-      const p = room.players.get(socket.id); if (p) p.connected = false;
+      const p = room.players.get(socket.id); if (p) { p.connected = false; p.focused = false; }
       emitRoom(room);
     }
     // Host room remains available for host rejoin while the process is alive.

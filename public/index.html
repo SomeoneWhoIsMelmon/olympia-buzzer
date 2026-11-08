@@ -6,21 +6,31 @@
 Đội 2</textarea></label><button class="primary wide" id="createRoom">TẠO PHÒNG</button></section>
 <section id="playerSetup" class="panel hidden"><button class="back" data-back>← Quay lại</button><h2>Tham gia trận đấu</h2><label>Mã phòng<input id="joinCode" maxlength="8" placeholder="VD: A1B2C3" autocomplete="off"></label><label>Tên người chơi<input id="playerName" maxlength="24" placeholder="Tên của bạn"></label><label>Đội<select id="playerTeam"><option value="">Đợi tải danh sách đội…</option></select></label><button class="primary wide" id="joinRoom">THAM GIA</button></section>
 <section id="hostView" class="hidden host-page">
-  <div class="topline host-topline"><div><div class="eyebrow">MÃ PHÒNG</div><div class="roomcode" id="hostCode">------</div></div><button class="secondary" id="copyLink">SAO CHÉP LINK</button></div>
+  <div class="topline host-topline"><div><div class="eyebrow">MÃ PHÒNG</div><div class="roomcode" id="hostCode">------</div></div><div class="host-top-actions"><button class="secondary" id="openProjector">MÁY CHIẾU</button><button class="secondary" id="copyLink">SAO CHÉP LINK</button></div></div>
   <div class="host-layout">
-    <div class="statusline host-statusline"><span id="hostStatus" class="status">ĐANG CHỜ</span><span id="hostTimer" class="timer">--</span></div>
     <textarea id="hostQuestionInput" class="question-display host-question" rows="2" maxlength="500" placeholder="NHẬP CÂU HỎI"></textarea>
+    <div class="panel host-future-panel">Khoảng trống cho các tính năng sau này.</div>
     <div class="panel host-score-panel"><div class="scorehead"><h2>Bảng điểm</h2><span id="playerCount" class="muted">0 người</span></div><div id="hostPlayers" class="players"></div></div>
     <div class="panel host-controls-panel">
       <h2>ĐIỀU KHIỂN</h2>
+      <div class="statusline host-statusline"><span id="hostStatus" class="status">ĐANG CHỜ</span><span id="hostTimer" class="timer">--</span></div>
       <div class="winner" id="hostWinner">Chưa có người bấm chuông</div>
-      <label class="buzzer-duration">Thời gian mở chuông (giây)<input id="duration" type="number" min="1" max="300" value="5"></label>
+      <div class="host-round-settings">
+        <label class="buzzer-duration">Thời gian mở chuông (giây)<input id="duration" type="number" min="1" max="300" value="5"></label>
+        <label class="toggleline"><input id="alwaysOpen" type="checkbox"> Chuông luôn mở <small class="muted">(một người bấm không khóa chuông của người khác)</small></label>
+      </div>
       <div class="controls"><button class="primary" id="startRound">MỞ CHUÔNG</button><button class="secondary" id="lockRound">KHÓA</button><button class="secondary" id="resetRound">RESET</button></div>
-      <label class="toggleline"><input id="alwaysOpen" type="checkbox"> Chuông luôn mở <small class="muted">(một người bấm không khóa chuông của người khác)</small></label>
     </div>
     <div class="panel host-answers-panel"><div class="answerhead"><div><h2>Câu trả lời mới nhất của mỗi thí sinh</h2><p class="muted">Thời gian tính từ lúc Host mở lượt.</p></div><span id="answerCount" class="muted">0 câu trả lời</span></div><div id="hostAnswers" class="answers"><p class="muted">Chưa có câu trả lời.</p></div></div>
     <div class="panel host-buzzes-panel"><div class="answerhead"><div><h2>Lịch sử bấm chuông</h2><p class="muted">Thứ tự theo thời điểm máy chủ nhận tín hiệu.</p></div><span id="buzzCount" class="muted">0 lượt</span></div><div id="hostBuzzes" class="answers"><p class="muted">Chưa có thí sinh bấm chuông.</p></div></div>
-    <div class="independent-clock host-clock"><div class="independent-title"><div><h2>THỜI GIAN TRẢ LỜI</h2><p class="muted">Đồng hồ riêng cho ô trả lời của thí sinh.</p></div><strong id="hostIndependentDisplay">01:00</strong></div><div class="independent-controls"><label>Thời gian trả lời (giây)<input id="independentDuration" type="number" min="1" max="3600" value="60"></label><button class="primary" id="independentStart">BẮT ĐẦU</button><button class="secondary" id="independentPause">TẠM DỪNG</button><button class="secondary" id="independentReset">ĐẶT LẠI</button></div></div>
+    <div class="independent-clock host-clock"><div class="independent-title"><div><h2>THỜI GIAN TRẢ LỜI</h2><p class="muted">Đồng hồ riêng cho ô trả lời của thí sinh.</p></div><strong id="hostIndependentDisplay">01:00</strong></div><div class="independent-controls"><label>Thời gian trả lời (giây)<input id="independentDuration" type="number" min="1" max="3600" value="60"></label><button class="primary" id="independentStart">BẮT ĐẦU</button><button class="secondary" id="independentPause">TẠM DỪNG</button><button class="secondary" id="independentReset">ĐẶT LẠI</button><button class="secondary answer-reveal-trigger" id="revealLatestAnswers" type="button">HIỆN ĐÁP ÁN</button></div></div>
+  </div>
+</section>
+<section id="projectorView" class="hidden projector-page">
+  <button id="projectorFullscreen" class="projector-fullscreen" type="button" aria-label="Bật toàn màn hình">TOÀN MÀN HÌNH</button>
+  <div class="projector-stage">
+    <section class="projector-question-panel"><div id="projectorQuestion" class="projector-question">CÂU HỎI</div></section>
+    <section class="projector-score-panel"><div id="projectorScoreboard" class="projector-scoreboard"></div></section>
   </div>
 </section>
 <section id="playerView" class="hidden player-page">
@@ -41,4 +51,11 @@
     <div class="scorebox">Điểm của bạn: <strong id="myScore">0</strong></div>
   </div>
 </section>
+<dialog id="answerRevealDialog" class="answer-reveal-dialog" aria-labelledby="answerRevealTitle">
+  <div class="answer-reveal-content">
+    <h2 id="answerRevealTitle">CÂU TRẢ LỜI MỚI NHẤT CỦA CÁC THÍ SINH</h2>
+    <div id="revealedAnswers" class="revealed-answers" aria-live="polite"></div>
+    <button id="closeAnswerReveal" class="primary" type="button">ĐÓNG</button>
+  </div>
+</dialog>
 <div id="toast" class="toast hidden"></div><footer>Olympia Buzzer · Bản thử nghiệm mã nguồn mở</footer></main><script src="/socket.io/socket.io.js"></script><script src="/app.js"></script></body></html>
