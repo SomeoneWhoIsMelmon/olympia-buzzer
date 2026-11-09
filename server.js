@@ -17,6 +17,7 @@ const clean = (s, max = 24) => String(s || '').trim().replace(/[<>]/g, '').slice
 function publicRoom(room) {
   return {
     code: room.code, status: room.status, duration: room.duration, question: room.question || '',
+    projectorVolume: room.projectorVolume,
     deadline: room.deadline, openingDeadline: room.openingDeadline || null, buzzerCountdownDeadline: room.buzzerCountdownDeadline || null, winnerCountdownDeadline: room.winnerCountdownDeadline || null, buzzerAlwaysOpen: room.buzzerAlwaysOpen, winnerId: room.winnerId, buzzes: room.buzzes || [],
     spotlightRound: room.spotlightRound || '', spotlightPlayerId: room.spotlightPlayerId || null,
     openingQuestionRound: room.openingQuestionRound || '', openingQuestionIndex: Number.isInteger(room.openingQuestionIndex) ? room.openingQuestionIndex : null,
@@ -121,7 +122,7 @@ io.on('connection', socket => {
   socket.on('host:create', ({ hostName, duration, teams } = {}, ack = () => {}) => {
     let roomCode; do { roomCode = code(); } while (rooms.has(roomCode));
     const room = {
-      code: roomCode, hostId: socket.id, hostName: clean(hostName, 24) || 'Host', question: '',
+      code: roomCode, hostId: socket.id, hostName: clean(hostName, 24) || 'Host', question: '', projectorVolume: 1,
       duration: Math.max(1, Math.min(300, Number(duration) || 5)),
       buzzerAlwaysOpen: false,
       teams: Array.isArray(teams) ? teams.slice(0, 12).map(t => clean(t, 20)).filter(Boolean) : ['Đội 1', 'Đội 2'],
@@ -400,6 +401,14 @@ io.on('connection', socket => {
       emitRoom(room);
     }
     io.to(room.code).emit('projector:audio', { type });
+    ack({ ok: true });
+  });
+  socket.on('host:projector:volume', ({ volume } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (typeof volume !== 'number' || !Number.isFinite(volume) || volume < 0 || volume > 1) return ack({ ok: false, error: 'Mức âm lượng không hợp lệ.' });
+    room.projectorVolume = volume;
+    io.to(room.code).emit('projector:volume', { volume });
     ack({ ok: true });
   });
   socket.on('host:spotlight', ({ round, playerId } = {}, ack = () => {}) => {

@@ -145,6 +145,9 @@ body,body.player-active{background:#000040;}
  .host-active .host-layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"status" "question" "score" "controls" "answers" "buzzes" "clock";gap:10px;}
  .host-active .host-question{height:clamp(180px,34vh,300px);}
  .host-active .host-score-panel{height:auto;max-height:280px;min-height:140px;}
+ .host-active .host-control-heading{flex-wrap:wrap;}
+ .host-active .projector-volume-control{margin-left:auto;}
+ .host-active .projector-volume-control input{width:clamp(70px,20vw,120px);}
  .host-active .host-clock .independent-controls{grid-template-columns:1fr 1fr;}
  .host-active .host-clock .independent-controls label{grid-column:1/-1;}
 }
@@ -157,6 +160,11 @@ body,body.player-active{background:#000040;}
 .host-active .host-score-panel,.host-active .host-controls-panel,.host-active .host-answers-panel,.host-active .host-buzzes-panel,.host-active .host-clock{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .host-active .host-score-panel .players,.host-active .host-answers-panel .answers,.host-active .host-buzzes-panel .answers{min-height:0;overflow:auto;}
 .host-active .host-controls-panel{gap:4px;padding:10px 14px;}
+.host-active .host-control-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.host-active .host-control-heading h2{margin:0;}
+.host-active .projector-volume-control{display:flex;align-items:center;gap:8px;margin:0;color:#fff;font-size:12px;white-space:nowrap;}
+.host-active .projector-volume-control input{width:clamp(90px,12vw,160px);height:22px;margin:0;padding:0;accent-color:#fff;cursor:pointer;}
+.host-active .projector-volume-control output{min-width:3.5ch;text-align:right;font-variant-numeric:tabular-nums;}
 .host-active .host-controls-panel .winner{padding:2px 0;}
 .host-active .host-round-settings{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:center;gap:8px;}
 .host-active .host-controls-panel .buzzer-duration{min-width:0;margin:2px 0;}
