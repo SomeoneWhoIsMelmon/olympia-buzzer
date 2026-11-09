@@ -16,7 +16,7 @@
       <div class="opening-question-layout">
         <div class="opening-question-settings">
           <div class="opening-mode-buttons">
-            <button class="secondary" id="startFiveSecondTimer" type="button">5s (Z)</button>
+            <div class="opening-timer-buttons"><button class="secondary" id="startFiveSecondTimer" type="button">5s (Z)</button><button class="secondary" id="playBlankSound" type="button">BLANK (B)</button></div>
             <button class="secondary" id="startOpeningO27" type="button">KĐO27</button>
           </div>
           <div class="opening-selection-fields">
@@ -64,6 +64,7 @@
   <div class="database-toolbar">
     <label class="database-file-label">Nhập workbook Excel (.xlsx)<input id="databaseFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
     <button class="primary" id="importWorkbook" type="button">NHẬP SHEET KHỞI ĐỘNG</button>
+    <button class="secondary" id="clearDatabase" type="button" disabled>XÓA TOÀN BỘ</button>
     <span id="databaseCount" class="muted" aria-live="polite">0 câu hỏi</span>
   </div>
   <p class="database-import-note">Chỉ nhập sheet “Khởi Động”: câu hỏi lấy từ các vùng C4:C23, C26:C45, C48:C67, C70:C89 và C92:C111; đáp án được lấy từ ô cột D cùng hàng.</p>

@@ -165,7 +165,7 @@ io.on('connection', socket => {
     if (!canSubmit) return ack({ ok: false, error: 'Đã hết thời gian nhận câu trả lời.' });
     const text = String(answer || '').trim().slice(0, 500);
     if (!text) return ack({ ok: false, error: 'Bạn chưa nhập câu trả lời.' });
-    const elapsedMs = Math.max(0, Date.now() - (at.startedAt || Date.now()));
+    const elapsedMs = Math.max(0, at.duration * 1000 - Math.max(0, at.deadline - Date.now()));
     const submission = {
       id: crypto.randomUUID(), playerId: player.id, name: player.name, team: player.team,
       answer: text, elapsedMs, submittedAt: Date.now()
@@ -374,7 +374,7 @@ io.on('connection', socket => {
   socket.on('host:opening:audio', ({ type } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
-    if (!['start', 'end', 'opening'].includes(type)) return ack({ ok: false, error: 'Lệnh âm thanh không hợp lệ.' });
+    if (!['start', 'end', 'opening', 'blank'].includes(type)) return ack({ ok: false, error: 'Lệnh âm thanh không hợp lệ.' });
     if (type === 'start') {
       room.openingStartArmed = room.spotlightRound === 'Lượt chung';
       emitRoom(room);
@@ -496,6 +496,13 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     ack({ ok: true, questions: room.questions });
+  });
+  socket.on('host:database:clear', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    const deleted = room.questions.length;
+    room.questions = [];
+    ack({ ok: true, questions: room.questions, deleted });
   });
   socket.on('host:database:import', ({ questions } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
