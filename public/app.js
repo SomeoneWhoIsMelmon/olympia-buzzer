@@ -1,8 +1,8 @@
 const socket = io();
 const $ = id => document.getElementById(id);
 const views = ['home','hostSetup','playerSetup','hostView','hostDatabase','playerView','projectorView'];
-let role = null, roomCode = null, myId = null, myTeam = null, latest = null, hostLink = null, lastStatus = null, audioCtx = null, projectorMasterGain = null, projectorVolume = 1, tickHandle = null, independentTickHandle = setInterval(updateIndependentTimer, 100), projectorAudioQueue = [], projectorAudioBuffers = new Map(), projectorAudioReady = false, projectorAudioLoading = new Map(), projectorAudioResumePending = false, projectorOpeningMusicSource = null, projectorOpeningMusicKey = null, projectorOpeningMusicGeneration = 0, databaseQuestions = [], openingCorrectStreak = 0, openingStreakPlayerId = '', openingScorePending = false;
-function show(id){ views.forEach(v => $(v).classList.toggle('hidden',v!==id)); document.body.classList.toggle('player-active',id==='playerView'); document.body.classList.toggle('host-active',id==='hostView'||id==='hostDatabase'); document.body.classList.toggle('projector-active',id==='projectorView'); }
+let role = null, roomCode = null, myId = null, myTeam = null, latest = null, hostLink = null, lastStatus = null, audioCtx = null, projectorMasterGain = null, projectorVolume = 1, tickHandle = null, independentTickHandle = setInterval(updateIndependentTimer, 100), projectorAudioQueue = [], projectorAudioBuffers = new Map(), projectorAudioReady = false, projectorAudioLoading = new Map(), projectorAudioResumePending = false, projectorOpeningMusicSource = null, projectorOpeningMusicKey = null, projectorOpeningMusicGeneration = 0, databaseQuestions = [], speedQuestionSlots = Array.from({length:4},()=>({prompt:'',media:null})), obstacleCourse = {rows:Array.from({length:4},()=>({answer:'',question:''})),keyword:'',fullAnswer:''}, speedMediaObjectUrls = Array(4).fill(null), speedMediaLoadVersions = Array(4).fill(0), openingCorrectStreak = 0, openingStreakPlayerId = '', openingScorePending = false;
+function show(id){ views.forEach(v => $(v).classList.toggle('hidden',v!==id)); document.body.classList.toggle('player-active',id==='playerView'); document.body.classList.toggle('host-active',id==='hostView'||id==='hostDatabase'); document.body.classList.toggle('database-page-active',id==='hostDatabase'); document.body.classList.toggle('projector-active',id==='projectorView'); }
 function toast(msg){ $('toast').textContent=msg; $('toast').classList.remove('hidden'); setTimeout(()=>$('toast').classList.add('hidden'),2600); }
 function canPlayerBuzz(){if(role!=='player'||!latest||latest.status!=='playing'||latest.buzzerCountdownDeadline||!latest.deadline||Date.now()>=latest.deadline)return false;const me=latest.players.find(player=>player.id===myId);return latest.buzzerAlwaysOpen?!Boolean(me&&me.buzzedAt):!latest.winnerId;}
 function sound(type){ try { audioCtx ||= new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.connect(g);g.connect(audioCtx.destination);o.type='sine';o.frequency.value=type==='buzz'?880:type==='win'?660:440;g.gain.setValueAtTime(.001,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.18,audioCtx.currentTime+.015);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+(type==='win'?.45:.18));o.start();o.stop(audioCtx.currentTime+(type==='win'?.48:.2)); }catch(e){} }
@@ -64,8 +64,15 @@ document.addEventListener('keydown',event=>{
 $('goHost').onclick=()=>show('hostSetup'); $('goPlayer').onclick=()=>show('playerSetup'); document.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>show('home'));
 $('createRoom').onclick=async()=>{const teams=$('teams').value.split('\n').map(x=>x.trim()).filter(Boolean);const r=await emitAck('host:create',{hostName:$('hostName').value,duration:$('duration').value,teams});if(!r.ok)return toast(r.error);role='host';roomCode=r.code;hostLink=`${location.origin}/?room=${roomCode}`;$('hostCode').textContent=roomCode;show('hostView');render(r.state);renderAnswers([]);await loadDatabase();};
 $('openProjector').onclick=()=>{const projector=window.open(`${location.origin}/?projector=${encodeURIComponent(roomCode)}`,'_blank');if(!projector)toast('Trình duyệt đã chặn cửa sổ máy chiếu. Hãy cho phép cửa sổ bật lên rồi thử lại.');};
-$('openDatabase').onclick=async()=>{show('hostDatabase');await loadDatabase();};
-$('closeDatabase').onclick=()=>show('hostView');
+$('openDatabase').onclick=()=>{
+ const databasePage=window.open('about:blank','_blank');
+ if(!databasePage)return toast('Trình duyệt đã chặn cửa sổ Database. Hãy cho phép cửa sổ bật lên rồi thử lại.');
+ emitAck('host:database:token').then(result=>{
+  if(!result.ok){databasePage.close();return toast(result.error);}
+  databasePage.location.href=`${location.origin}/?database=${encodeURIComponent(roomCode)}#${result.token}`;
+ }).catch(error=>{databasePage.close();toast(`Không thể mở Database: ${error.message}`);});
+};
+$('closeDatabase').onclick=()=>{if(role==='database')window.close();else show('hostView');};
 $('clearDatabase').onclick=async()=>{
  if(!databaseQuestions.length)return;
  if(!confirm(`Xóa toàn bộ ${databaseQuestions.length} câu hỏi khỏi Database của phòng này?`))return;
@@ -78,7 +85,93 @@ $('clearDatabase').onclick=async()=>{
  syncHostOpeningAnswer(latest);
  toast(`Đã xóa ${result.deleted} câu hỏi khỏi Database.`);
 };
-$('importWorkbook').onclick=async()=>{const file=$('databaseFile').files[0];if(!file)return toast('Hãy chọn file Excel .xlsx trước.');try{const questions=await window.parseOlympiaWorkbook(file);if(!confirm(`Tìm thấy ${questions.length} câu hỏi và đáp án tương ứng trong sheet “Khởi Động” (câu hỏi cột C, đáp án cột D). Nhập thêm vào database của phòng này?`))return;const r=await emitAck('host:database:import',{questions});if(!r.ok)return toast(r.error);databaseQuestions=r.questions;renderDatabase();refreshSpotlightControls(latest);syncHostOpeningAnswer(latest);$('databaseFile').value='';toast(`Đã nhập ${r.imported} câu hỏi.`);}catch(error){toast(`Không thể nhập file Excel: ${error.message}`);}};
+$('importWorkbook').onclick=async()=>{
+ const file=$('databaseFile').files[0];
+ if(!file)return toast('Hãy chọn file Excel .xlsx trước.');
+ try{
+  const workbookData=await window.parseOlympiaWorkbook(file);
+  const questionCount=workbookData.questions.length,speedCount=workbookData.speedQuestions?.filter(item=>item.prompt||item.answer).length||0;
+  const speedAction=workbookData.speedQuestions?'cập nhật 4 ô Tăng tốc':'giữ nguyên 4 ô Tăng tốc (không có sheet “Tăng tốc B”)';
+  const obstacleCount=workbookData.obstacleCourse?.rows.filter(item=>item.answer||item.question).length||0;
+  const obstacleAction=workbookData.obstacleCourse?'cập nhật bảng Vượt chướng ngại vật':'giữ nguyên bảng Vượt chướng ngại vật (không có sheet “VCNV”)';
+  if(!confirm(`Tìm thấy ${questionCount} câu Khởi Động, ${speedCount} câu Tăng tốc và ${obstacleCount} hàng ngang Vượt chướng ngại vật. Nhập đề và ${speedAction}, ${obstacleAction}?`))return;
+  const result=await emitAck('host:database:import-document',workbookData);
+  if(!result.ok)return toast(result.error);
+  databaseQuestions=result.questions;
+  if(result.speedQuestions){speedQuestionSlots=result.speedQuestions;renderSpeedQuestionSlots();}
+  if(result.obstacleCourse){obstacleCourse=result.obstacleCourse;renderObstacleCourse();}
+  renderDatabase();refreshSpotlightControls(latest);syncHostOpeningAnswer(latest);
+  $('databaseFile').value='';
+  toast(`Đã nhập ${result.imported} câu Khởi Động; ${workbookData.speedQuestions?'đã cập nhật 4 câu Tăng tốc':'giữ nguyên câu Tăng tốc'}; ${workbookData.obstacleCourse?'đã cập nhật bảng Vượt chướng ngại vật.':'giữ nguyên bảng Vượt chướng ngại vật.'}`);
+ }catch(error){toast(`Không thể nhập file Excel: ${error.message}`);}
+};
+$('speedQuestionSlots').querySelectorAll('.database-speed-card').forEach(card=>{
+ const slot=Number(card.dataset.speedSlot),prompt=card.querySelector('.database-speed-prompt'),answer=card.querySelector('.database-speed-answer'),button=card.querySelector('.database-speed-media-button'),fileInput=card.querySelector('.database-speed-file');
+ const saveTextField=async(field,input)=>{
+  const result=await emitAck('host:database:speed-question:update',{slot,[field]:input.value});
+  if(!result.ok){toast(result.error);input.value=speedQuestionSlots[slot][field];}
+  else speedQuestionSlots[slot][field]=input.value;
+ };
+ prompt.addEventListener('change',()=>saveTextField('prompt',prompt));
+ answer.addEventListener('change',()=>saveTextField('answer',answer));
+ button.addEventListener('click',async()=>{
+  if(speedQuestionSlots[slot].media){
+   button.disabled=true;
+   const result=await emitAck('host:database:speed-media:delete',{slot});
+   button.disabled=false;
+   if(!result.ok)return toast(result.error);
+   speedMediaLoadVersions[slot]++;
+   speedQuestionSlots[slot].media=null;
+   renderSpeedMediaPreview(slot);
+   toast(`Đã xóa media Tăng tốc ${slot+1}.`);
+   return;
+  }
+  fileInput.click();
+ });
+ fileInput.addEventListener('change',async()=>{
+  const file=fileInput.files[0];
+  if(!file)return;
+  if(file.size>10*1024*1024){fileInput.value='';return toast('File media không được vượt quá 10 MB.');}
+  if(!/^(image|video)\//i.test(file.type)){fileInput.value='';return toast('Chỉ hỗ trợ file ảnh hoặc video.');}
+  button.disabled=true;
+  try{
+   const result=await emitAck('host:database:speed-media:set',{slot,name:file.name,type:file.type,data:await file.arrayBuffer()});
+   if(!result.ok)return toast(result.error);
+   speedMediaLoadVersions[slot]++;
+   speedQuestionSlots[slot].media=result.media;
+   renderSpeedMediaPreview(slot,file);
+  }catch(error){toast(`Không thể tải media lên: ${error.message}`);}
+  finally{button.disabled=false;fileInput.value='';}
+ });
+});
+$('databaseObstacleCourse').querySelectorAll('[data-obstacle-row]').forEach(rowElement=>{
+ const rowIndex=Number(rowElement.dataset.obstacleRow),cells=rowElement.querySelector('.obstacle-answer-grid');
+ for(let cellIndex=0;cellIndex<16;cellIndex++){
+  const input=document.createElement('input');
+  input.type='text';input.maxLength=4;input.autocomplete='off';input.setAttribute('aria-label',`Đáp án hàng ngang ${rowIndex+1}, ô ${cellIndex+1}`);
+  input.addEventListener('input',()=>{
+   const graphemes=splitGraphemes(input.value);
+   if(graphemes.length>1){
+    cells.querySelectorAll('input').forEach((cell,index)=>{cell.value=graphemes[index]||'';});
+   }
+   updateObstacleLetterCount(rowElement);
+  });
+  input.addEventListener('keydown',event=>{
+   if(event.key==='Backspace'&&!input.value&&cellIndex>0){cells.querySelectorAll('input')[cellIndex-1].focus();}
+   else if(event.key.length===1&&cellIndex<15&&!event.ctrlKey&&!event.metaKey&&!event.altKey){setTimeout(()=>{if(input.value)cells.querySelectorAll('input')[cellIndex+1].focus();},0);}
+  });
+  input.addEventListener('change',()=>saveObstacleCourse({row:rowIndex,answer:readObstacleAnswer(rowElement)}));
+  cells.append(input);
+ }
+ rowElement.querySelector('.obstacle-question').addEventListener('change',event=>saveObstacleCourse({row:rowIndex,question:event.currentTarget.value}));
+});
+$('databaseObstacleCourse').querySelector('.obstacle-keyword').addEventListener('change',event=>{
+ updateObstacleKeywordCount();
+ saveObstacleCourse({keyword:event.currentTarget.value});
+});
+$('databaseObstacleCourse').querySelector('.obstacle-keyword-question').addEventListener('change',event=>saveObstacleCourse({keywordQuestion:event.currentTarget.value}));
+$('databaseObstacleCourse').querySelector('.obstacle-full-answer').addEventListener('input',updateObstacleFullAnswerCount);
+$('databaseObstacleCourse').querySelector('.obstacle-full-answer').addEventListener('change',event=>saveObstacleCourse({fullAnswer:event.currentTarget.value}));
 $('spotlightRound').addEventListener('change',saveSpotlightSelection);
 $('spotlightPlayer').addEventListener('change',saveSpotlightSelection);
 $('spotlightPlayer').addEventListener('change',()=>{
@@ -189,7 +282,7 @@ function renderAnswers(answers=[]){const latestByPlayer=new Map();for(const a of
 function renderBuzzes(buzzes=[]){if(!$('hostBuzzes'))return;$('buzzCount').textContent=`${buzzes.length} lượt`;$('hostBuzzes').innerHTML='';if(!buzzes.length){$('hostBuzzes').innerHTML='<p class="muted">Chưa có thí sinh bấm chuông.</p>';return;}[...buzzes].sort((a,b)=>a.elapsedMs-b.elapsedMs).forEach((b,i)=>{const card=document.createElement('article');card.className='answercard';const top=document.createElement('div');top.className='answercardtop';const who=document.createElement('strong');who.textContent=`${i+1}. ${b.name} · ${b.team}`;const time=document.createElement('time');time.textContent=formatElapsed(b.elapsedMs);top.append(who,time);card.append(top);$('hostBuzzes').append(card);});}
 function queueNewProjectorBuzzes(state,previous){if(role!=='projector'||!previous)return;if(state.buzzerAlwaysOpen&&!(previous.buzzes||[]).length&&(state.buzzes||[]).length)queueProjectorBuzz();else if(!state.buzzerAlwaysOpen&&!previous.buzzerAlwaysOpen&&state.winnerId&&state.winnerId!==previous.winnerId)queueProjectorBuzz();}
 socket.on('projector:audio',({type}={})=>{if(role==='projector'&&['correct','wrong','start','end','opening','blank'].includes(type))queueProjectorAudio(type);});
-function renderBase(state){const previous=latest;if(!state)return;queueNewProjectorBuzzes(state,previous);latest=state;if(Number.isFinite(state.projectorVolume))setProjectorVolume(state.projectorVolume);if(role==='projector')syncProjectorOpeningMusic(state);if(role==='player')$('questionDisplay').textContent=state.question||'CÂU HỎI';if(role==='host'&&!$('hostQuestionInput').matches(':focus'))$('hostQuestionInput').value=state.question||'';if(role==='projector'){renderProjector(state);return;}const names={waiting:'ĐANG CHỜ',playing:'CHUÔNG ĐANG MỞ',won:'ĐÃ CÓ NGƯỜI BẤM',locked:'ĐÃ KHÓA',timeout:'HẾT THỜI GIAN'};const winner=state.players.find(p=>p.id===state.winnerId);
+function renderBase(state){const previous=latest;if(!state)return;queueNewProjectorBuzzes(state,previous);latest=state;if(Number.isFinite(state.projectorVolume))setProjectorVolume(state.projectorVolume);if(role==='projector')syncProjectorOpeningMusic(state);if(role==='player')$('questionDisplay').textContent=state.question||'CÂU HỎI';if(role==='host'&&!$('hostQuestionInput').matches(':focus'))$('hostQuestionInput').value=state.question||'';if(role==='projector'){renderProjector(state);updateTimer();return;}const names={waiting:'ĐANG CHỜ',playing:'CHUÔNG ĐANG MỞ',won:'ĐÃ CÓ NGƯỜI BẤM',locked:'ĐÃ KHÓA',timeout:'HẾT THỜI GIAN'};const winner=state.players.find(p=>p.id===state.winnerId);
 if(role==='host'){$('hostStatus').textContent=names[state.status]||state.status;$('hostStatus').className='status '+(state.status==='playing'?'live':state.status==='won'?'won':'');$('hostWinner').classList.add('hidden');$('hostWinner').textContent='';$('alwaysOpen').checked=Boolean(state.buzzerAlwaysOpen);$('playerCount').textContent=`${state.players.length} người`;renderHostPlayers(state.players,state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId);renderBuzzes(state.buzzes||[]);$('startRoundDelayed').disabled=Boolean(state.buzzerCountdownDeadline);}
 if(role==='player'){const wasAnswering=Boolean(previous&&previous.independentTimer&&previous.independentTimer.running&&previous.independentTimer.remainingMs>0);const isAnswering=Boolean(state.independentTimer&&state.independentTimer.running&&state.independentTimer.remainingMs>0);if(isAnswering&&!wasAnswering){$('answerInput').value='';$('answerInput').disabled=false;setTimeout(()=>$('answerInput').focus(),0);} $('playerStatus').textContent=names[state.status]||state.status;$('playerStatus').className='status '+(state.status==='playing'?'live':state.status==='won'?'won':'');const me=state.players.find(p=>p.id===myId);$('myScore').textContent=me?me.score:0;if(me&&me.latestAnswer){$('lastAnswerText').textContent=me.latestAnswer.answer;$('lastAnswerTime').textContent=`Đã gửi lúc ${formatElapsed(me.latestAnswer.elapsedMs)}`;}const canBuzz=state.status==='playing'&&!state.buzzerCountdownDeadline&&(state.buzzerAlwaysOpen?!Boolean(me&&me.buzzedAt):!state.winnerId);$('buzzButton').disabled=!canBuzz;$('buzzButton').classList.toggle('ready',canBuzz);$('buzzButton').classList.toggle('pressed',state.buzzerAlwaysOpen?Boolean(me&&me.buzzedAt):state.winnerId===myId);const canSubmitAnswer=isAnswering;$('answerInput').disabled=!canSubmitAnswer;$('submitAnswer').disabled=!canSubmitAnswer;$('answerMessage').textContent=canSubmitAnswer?'Bạn có thể gửi nhiều câu trả lời cho đến khi hết giờ. Nhấn Enter để gửi nhanh (Shift + Enter để xuống dòng).':'Chờ Host bắt đầu hoặc tiếp tục thời gian trả lời...';$('answerMessage').className='muted';$('playerMessage').textContent=state.buzzerCountdownDeadline?'Chuông sẽ mở sau khi đếm ngược kết thúc.':state.buzzerAlwaysOpen&&state.status==='playing'?(me&&me.buzzedAt?'Bạn đã bấm chuông. Hãy chờ Host!':'Chuông luôn mở – mỗi thí sinh được bấm một lần!'):winner?(winner.id===myId?'Bạn đã bấm chuông đầu tiên!':`${winner.name} đã bấm chuông trước.`):state.status==='playing'?'Chuông đã mở – hãy bấm thật nhanh!':state.status==='timeout'?'Đã hết thời gian.':state.status==='locked'?'Chuông đã khóa. Ô trả lời hoạt động theo đồng hồ riêng.':'Chờ Host mở chuông…';$('playerScoreboard').innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;[...state.players].sort((a,b)=>b.score-a.score).forEach(p=>$('playerScoreboard').append(scoreRow(p,false,p.id===fastestId)));}
 if((lastStatus==='playing'||lastStatus==='locked')&&state.status==='won')sound('win');if(state.status==='playing'&&lastStatus!=='playing')sound('open');lastStatus=state.status;updateTimer();updateIndependentTimer();}
@@ -217,7 +310,72 @@ const projectorObserver=new ResizeObserver(()=>{scaleProjectorScoreboard();fitPr
 function scoreRow(p,actions,highlight=false){const row=document.createElement('div');row.className='playerrow';if(highlight)row.classList.add('fastest-buzzer');if(actions&&p.focused===false){row.classList.add('unfocused-player');row.title='Thí sinh đang rời khỏi trang này hoặc không focus vào trang.';}const name=document.createElement('div');name.innerHTML=`<div class="playername"><i class="${p.connected?'connected':'connected disconnected'}"></i></div><div class="playerteam"></div>`;name.querySelector('.playername').append(document.createTextNode(p.name));name.querySelector('.playerteam').textContent=p.team;const pts=document.createElement('div');pts.className='points';pts.textContent=p.score;row.append(name,pts);if(actions){const a=document.createElement('div');a.className='scoreactions';for(const [label,delta,cls] of [['+10',10,''],['-5',-5,'minus']]){const b=document.createElement('button');b.textContent=label;b.className=cls;b.onclick=()=>changeScore(p.id,delta);a.append(b);}const customInput=document.createElement('input');customInput.type='number';customInput.min='-100';customInput.max='1000';customInput.step='1';customInput.placeholder='Điểm';customInput.setAttribute('aria-label',`Số điểm thay đổi cho ${p.name}`);const customButton=document.createElement('button');customButton.textContent='ÁP DỤNG';customButton.title='Áp dụng số điểm đã nhập';customButton.onclick=()=>{const delta=Number(customInput.value);if(!Number.isInteger(delta)||delta< -100||delta>1000)return toast('Nhập số nguyên từ -100 đến 1000.');changeScore(p.id,delta);};a.append(customInput,customButton);const rm=document.createElement('button');rm.textContent='×';rm.title='Xóa người chơi';rm.onclick=()=>emitAck('host:remove',{playerId:p.id});a.append(rm);row.append(a);}return row;}
 async function changeScore(playerId,delta){const r=await emitAck('host:score',{playerId,delta});if(!r.ok){toast(r.error);return false;}return true;}
 function renderHostPlayers(players,fastestId){$('hostPlayers').innerHTML='';if(!players.length){$('hostPlayers').innerHTML='<p class="muted">Chưa có người chơi. Chia sẻ mã phòng để mọi người tham gia.</p>';return;}players.forEach(p=>$('hostPlayers').append(scoreRow(p,true,p.id===fastestId)));}
-async function loadDatabase(){const r=await emitAck('host:database:get');if(!r.ok){toast(r.error);show('hostView');return;}databaseQuestions=r.questions;renderDatabase();refreshSpotlightControls(latest);syncHostOpeningAnswer(latest);}
+async function loadDatabase(){const r=await emitAck('host:database:get');if(!r.ok){toast(r.error);show(role==='database'?'home':'hostView');return;}databaseQuestions=r.questions;speedQuestionSlots=(Array.isArray(r.speedQuestions)?r.speedQuestions:[]).slice(0,4);while(speedQuestionSlots.length<4)speedQuestionSlots.push({prompt:'',answer:'',media:null});speedQuestionSlots.forEach(slot=>{slot.answer||='';});obstacleCourse=r.obstacleCourse||{rows:Array.from({length:4},()=>({answer:'',question:''})),keyword:'',fullAnswer:''};obstacleCourse.rows=Array.from({length:4},(_,index)=>obstacleCourse.rows?.[index]||{answer:'',question:''});renderObstacleCourse();renderSpeedQuestionSlots();renderDatabase();refreshSpotlightControls(latest);syncHostOpeningAnswer(latest);}
+function splitGraphemes(value){
+ if(typeof Intl.Segmenter==='function')return [...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(value)].map(item=>item.segment);
+ return Array.from(value);
+}
+function readObstacleAnswer(rowElement){return [...rowElement.querySelectorAll('.obstacle-answer-grid input')].map(input=>input.value).join('');}
+function obstacleCharacterCount(value){return splitGraphemes(value).filter(character=>!/\s/u.test(character)).length;}
+function updateObstacleLetterCount(rowElement){rowElement.querySelector('.obstacle-letter-count').textContent=String(obstacleCharacterCount(readObstacleAnswer(rowElement)));}
+function renderObstacleCourse(){
+ obstacleCourse.rows.forEach((row,index)=>{
+  const element=$('databaseObstacleCourse').querySelector(`[data-obstacle-row="${index}"]`);
+  const cells=splitGraphemes(row.answer||'');
+  element.querySelectorAll('.obstacle-answer-grid input').forEach((input,cellIndex)=>{input.value=cells[cellIndex]||'';});
+  element.querySelector('.obstacle-question').value=row.question||'';
+  updateObstacleLetterCount(element);
+ });
+ $('databaseObstacleCourse').querySelector('.obstacle-keyword').value=obstacleCourse.keyword||'';
+ $('databaseObstacleCourse').querySelector('.obstacle-keyword-question').value=obstacleCourse.keywordQuestion||'';
+ updateObstacleKeywordCount();
+ $('databaseObstacleCourse').querySelector('.obstacle-full-answer').value=obstacleCourse.fullAnswer||'';
+ updateObstacleFullAnswerCount();
+}
+function updateObstacleKeywordCount(){
+ $('databaseObstacleCourse').querySelector('.obstacle-keyword-count').textContent=String(obstacleCharacterCount($('databaseObstacleCourse').querySelector('.obstacle-keyword').value));
+}
+function updateObstacleFullAnswerCount(){
+ $('databaseObstacleCourse').querySelector('.obstacle-full-answer-count').textContent=String(obstacleCharacterCount($('databaseObstacleCourse').querySelector('.obstacle-full-answer').value));
+}
+async function saveObstacleCourse(update){
+ const result=await emitAck('host:database:obstacle-course:update',update);
+ if(!result.ok){toast(result.error);await loadDatabase();return;}
+ obstacleCourse=result.obstacleCourse;
+}
+function renderSpeedQuestionSlots(){
+ speedQuestionSlots.forEach((slot,index)=>{
+  const card=$('speedQuestionSlots').querySelector(`[data-speed-slot="${index}"]`);
+  card.querySelector('.database-speed-prompt').value=slot.prompt||'';
+  card.querySelector('.database-speed-answer').value=slot.answer||'';
+  speedMediaLoadVersions[index]++;
+  renderSpeedMediaPreview(index);
+  if(!slot.media)return;
+  const version=speedMediaLoadVersions[index];
+  const preview=card.querySelector('.database-speed-preview');
+  preview.replaceChildren(document.createTextNode('Đang tải media…'));
+  emitAck('host:database:speed-media:get',{slot:index}).then(result=>{
+   if(version!==speedMediaLoadVersions[index])return;
+   if(!result.ok){toast(result.error);renderSpeedMediaPreview(index);return;}
+   speedQuestionSlots[index].media={name:result.media.name,type:result.media.type,size:result.media.size};
+   renderSpeedMediaPreview(index,new Blob([result.media.data],{type:result.media.type}));
+  }).catch(error=>toast(`Không thể tải media Tăng tốc ${index+1}: ${error.message}`));
+ });
+}
+function renderSpeedMediaPreview(index,fileOrBlob=null){
+ const card=$('speedQuestionSlots').querySelector(`[data-speed-slot="${index}"]`),preview=card.querySelector('.database-speed-preview'),media=speedQuestionSlots[index].media;
+ if(speedMediaObjectUrls[index]){URL.revokeObjectURL(speedMediaObjectUrls[index]);speedMediaObjectUrls[index]=null;}
+ preview.replaceChildren();
+ card.querySelector('.database-speed-filename').textContent=media?media.name:'Tối đa 10 MB';
+ if(!media){const placeholder=document.createElement('span');placeholder.textContent='Ảnh';preview.append(placeholder);return;}
+ if(fileOrBlob)speedMediaObjectUrls[index]=URL.createObjectURL(fileOrBlob);
+ if(!speedMediaObjectUrls[index]){const placeholder=document.createElement('span');placeholder.textContent='Media';preview.append(placeholder);return;}
+ const element=document.createElement(media.type.startsWith('video/')?'video':'img');
+ element.src=speedMediaObjectUrls[index];
+ if(element instanceof HTMLVideoElement){element.controls=true;element.preload='metadata';element.playsInline=true;}
+ else element.alt=media.name;
+ preview.append(element);
+}
 function refreshSpotlightControls(state){
  if(role!=='host')return;
  const rounds=['Thí sinh 1','Thí sinh 2','Thí sinh 3','Thí sinh 4','Lượt chung'].filter(round=>databaseQuestions.some(question=>question.round===round));
@@ -305,7 +463,7 @@ function updateIndependentTimer(){const t=latest&&latest.independentTimer;if(!t)
 function updateTimer(){
  clearInterval(tickHandle);
  const paint=()=>{
-  if(!latest){$('hostTimer').textContent='--';$('playerTimer').textContent='--';return;}
+  if(!latest){$('hostTimer').textContent='--';$('playerTimer').textContent='--';$('projectorQuestionTimerBox').classList.add('hidden');$('projectorQuestionTimer').textContent='';return;}
   const now=Date.now();
   const countdownDeadline=latest.buzzerCountdownDeadline;
   const countdownActive=Boolean(countdownDeadline&&countdownDeadline>now);
@@ -313,6 +471,12 @@ function updateTimer(){
   const buzzerDeadline=countdownDeadline|| (buzzerActive?latest.deadline:null);
   const buzzerSeconds=buzzerDeadline?(countdownDeadline?Math.max(1,Math.ceil((buzzerDeadline-now)/1000)):Math.max(0,Math.ceil((buzzerDeadline-now)/1000))):null;
   const openingSeconds=latest.openingDeadline?Math.max(0,Math.ceil((latest.openingDeadline-now)/1000)):null;
+  const showOpeningTimer=!countdownDeadline&&openingSeconds!==null;
+  if(role==='projector'){
+   const showProjectorTimer=showOpeningTimer&&openingSeconds>0;
+   $('projectorQuestionTimerBox').classList.toggle('hidden',!showProjectorTimer);
+   $('projectorQuestionTimer').textContent=showProjectorTimer?String(openingSeconds):'';
+  }
   if(role==='player'){
    const canBuzz=canPlayerBuzz();
    $('buzzButton').disabled=!canBuzz;
@@ -322,7 +486,6 @@ function updateTimer(){
    const winnerSeconds=latest.winnerCountdownDeadline&&wonByPlayer?Math.max(0,Math.ceil((latest.winnerCountdownDeadline-now)/1000)):null;
    const buzzLabel=$('buzzButton').querySelector('span');
    if(buzzLabel)buzzLabel.textContent=countdownDeadline?String(buzzerSeconds):winnerSeconds!==null?String(winnerSeconds):'BẤM CHUÔNG';
-   const showOpeningTimer=!countdownDeadline&&openingSeconds!==null;
    $('playerTimer').textContent=showOpeningTimer?`${openingSeconds}s`:'--';
   }
   if(role==='host'){
@@ -339,4 +502,4 @@ function updateTimer(){
  paint();
  if(latest&&(latest.buzzerCountdownDeadline||latest.winnerCountdownDeadline||latest.openingDeadline||(latest.deadline&&['playing','won','locked'].includes(latest.status))))tickHandle=setInterval(paint,100);
 }
-socket.on('room:update',render);socket.on('connect',async()=>{const params=new URLSearchParams(location.search),projectorCode=params.get('projector'),playerCode=params.get('room');if(projectorCode){role='projector';show('projectorView');const r=await emitAck('projector:join',{code:projectorCode});if(!r.ok){$('projectorQuestion').textContent=r.error;return;}roomCode=r.state.code;render(r.state);return;}if(playerCode){$('joinCode').value=playerCode.toUpperCase();show('playerSetup');}});socket.on('disconnect',()=>toast('Mất kết nối máy chủ. Đang thử kết nối lại…'));
+socket.on('room:update',render);socket.on('connect',async()=>{const params=new URLSearchParams(location.search),projectorCode=params.get('projector'),playerCode=params.get('room'),databaseCode=params.get('database');if(projectorCode){role='projector';show('projectorView');const r=await emitAck('projector:join',{code:projectorCode});if(!r.ok){$('projectorQuestion').textContent=r.error;return;}roomCode=r.state.code;render(r.state);return;}if(databaseCode){role='database';show('hostDatabase');$('closeDatabase').textContent='ĐÓNG TRANG';const storageKey=`olympia-database-token:${databaseCode}`;let token=location.hash.slice(1)||sessionStorage.getItem(storageKey)||'';if(!token){toast('Thiếu quyền truy cập Database. Hãy mở Database từ màn hình Host.');show('home');return;}const r=await emitAck('host:database:join',{code:databaseCode,token});if(!r.ok){sessionStorage.removeItem(storageKey);toast(r.error);show('home');return;}roomCode=r.code;sessionStorage.setItem(storageKey,token);if(location.hash)history.replaceState(null,'',`${location.pathname}${location.search}`);await loadDatabase();return;}if(playerCode){$('joinCode').value=playerCode.toUpperCase();show('playerSetup');}});socket.on('disconnect',()=>toast('Mất kết nối máy chủ. Đang thử kết nối lại…'));

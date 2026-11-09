@@ -63,17 +63,64 @@
   </div>
   <div class="database-toolbar">
     <label class="database-file-label">Nhập workbook Excel (.xlsx)<input id="databaseFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
-    <button class="primary" id="importWorkbook" type="button">NHẬP SHEET KHỞI ĐỘNG</button>
+    <button class="primary" id="importWorkbook" type="button">NHẬP ĐỀ</button>
     <button class="secondary" id="clearDatabase" type="button" disabled>XÓA TOÀN BỘ</button>
     <span id="databaseCount" class="muted" aria-live="polite">0 câu hỏi</span>
   </div>
-  <p class="database-import-note">Chỉ nhập sheet “Khởi Động”: câu hỏi lấy từ các vùng C4:C23, C26:C45, C48:C67, C70:C89 và C92:C111; đáp án được lấy từ ô cột D cùng hàng.</p>
+  <p class="database-import-note">Đọc câu hỏi Khởi Động từ C4:C23, C26:C45, C48:C67, C70:C89 và C92:C111 (đáp án ở cột D); câu hỏi Tăng tốc từ B3:B6 và đáp án từ C3:C6 trong sheet “Tăng tốc B”; bảng Vượt chướng ngại vật từ sheet “VCNV”.</p>
+  <div id="speedQuestionSlots" class="database-speed-grid" aria-label="Câu hỏi Tăng tốc">
+    <article class="database-speed-card" data-speed-slot="0">
+      <h2>Tăng tốc 1</h2>
+      <textarea class="database-speed-prompt" maxlength="5000" placeholder="Câu hỏi Tăng tốc 1" aria-label="Câu hỏi Tăng tốc 1"></textarea>
+      <textarea class="database-speed-answer" maxlength="5000" placeholder="Đáp án Tăng tốc 1" aria-label="Đáp án Tăng tốc 1"></textarea>
+      <div class="database-speed-media-controls"><button class="secondary database-speed-media-button" type="button">CHỌN MEDIA</button><input class="database-speed-file" type="file" accept="image/*,video/*" hidden><span class="database-speed-filename muted">Tối đa 10 MB</span></div>
+      <div class="database-speed-preview"><span>Ảnh</span></div>
+    </article>
+    <article class="database-speed-card" data-speed-slot="1">
+      <h2>Tăng tốc 2</h2>
+      <textarea class="database-speed-prompt" maxlength="5000" placeholder="Câu hỏi Tăng tốc 2" aria-label="Câu hỏi Tăng tốc 2"></textarea>
+      <textarea class="database-speed-answer" maxlength="5000" placeholder="Đáp án Tăng tốc 2" aria-label="Đáp án Tăng tốc 2"></textarea>
+      <div class="database-speed-media-controls"><button class="secondary database-speed-media-button" type="button">CHỌN MEDIA</button><input class="database-speed-file" type="file" accept="image/*,video/*" hidden><span class="database-speed-filename muted">Tối đa 10 MB</span></div>
+      <div class="database-speed-preview"><span>Ảnh</span></div>
+    </article>
+    <article class="database-speed-card" data-speed-slot="2">
+      <h2>Tăng tốc 3</h2>
+      <textarea class="database-speed-prompt" maxlength="5000" placeholder="Câu hỏi Tăng tốc 3" aria-label="Câu hỏi Tăng tốc 3"></textarea>
+      <textarea class="database-speed-answer" maxlength="5000" placeholder="Đáp án Tăng tốc 3" aria-label="Đáp án Tăng tốc 3"></textarea>
+      <div class="database-speed-media-controls"><button class="secondary database-speed-media-button" type="button">CHỌN MEDIA</button><input class="database-speed-file" type="file" accept="image/*,video/*" hidden><span class="database-speed-filename muted">Tối đa 10 MB</span></div>
+      <div class="database-speed-preview"><span>Ảnh</span></div>
+    </article>
+    <article class="database-speed-card" data-speed-slot="3">
+      <h2>Tăng tốc 4</h2>
+      <textarea class="database-speed-prompt" maxlength="5000" placeholder="Câu hỏi Tăng tốc 4" aria-label="Câu hỏi Tăng tốc 4"></textarea>
+      <textarea class="database-speed-answer" maxlength="5000" placeholder="Đáp án Tăng tốc 4" aria-label="Đáp án Tăng tốc 4"></textarea>
+      <div class="database-speed-media-controls"><button class="secondary database-speed-media-button" type="button">CHỌN MEDIA</button><input class="database-speed-file" type="file" accept="image/*,video/*" hidden><span class="database-speed-filename muted">Tối đa 10 MB</span></div>
+      <div class="database-speed-preview"><span>Ảnh</span></div>
+    </article>
+  </div>
+  <section id="databaseObstacleCourse" class="database-obstacle-course" aria-labelledby="obstacleCourseTitle">
+    <h2 id="obstacleCourseTitle">Vượt chướng ngại vật</h2>
+    <div class="database-obstacle-scroll">
+      <table class="database-obstacle-table">
+        <colgroup><col class="obstacle-index-column"><col class="obstacle-letters-column"><col class="obstacle-question-column"><col class="obstacle-count-column"></colgroup>
+        <thead><tr><th scope="col">STT</th><th scope="col">Đáp án hàng ngang</th><th scope="col">Câu hỏi</th><th scope="col">Số ký tự</th></tr></thead>
+        <tbody>
+          <tr data-obstacle-row="0"><th scope="row">1</th><td><div class="obstacle-answer-grid" aria-label="Đáp án hàng ngang 1"></div></td><td><textarea class="obstacle-question" maxlength="5000" aria-label="Câu hỏi hàng ngang 1"></textarea></td><td class="obstacle-letter-count">0</td></tr>
+          <tr data-obstacle-row="1"><th scope="row">2</th><td><div class="obstacle-answer-grid" aria-label="Đáp án hàng ngang 2"></div></td><td><textarea class="obstacle-question" maxlength="5000" aria-label="Câu hỏi hàng ngang 2"></textarea></td><td class="obstacle-letter-count">0</td></tr>
+          <tr data-obstacle-row="2"><th scope="row">3</th><td><div class="obstacle-answer-grid" aria-label="Đáp án hàng ngang 3"></div></td><td><textarea class="obstacle-question" maxlength="5000" aria-label="Câu hỏi hàng ngang 3"></textarea></td><td class="obstacle-letter-count">0</td></tr>
+          <tr data-obstacle-row="3"><th scope="row">4</th><td><div class="obstacle-answer-grid" aria-label="Đáp án hàng ngang 4"></div></td><td><textarea class="obstacle-question" maxlength="5000" aria-label="Câu hỏi hàng ngang 4"></textarea></td><td class="obstacle-letter-count">0</td></tr>
+          <tr class="obstacle-final-row"><th scope="row">OTT</th><td><input class="obstacle-keyword" type="text" maxlength="5000" aria-label="Đáp án ô chữ hàng dọc"></td><td><input class="obstacle-keyword-question" type="text" maxlength="5000" aria-label="Câu hỏi ô chữ hàng dọc"></td><td class="obstacle-keyword-count obstacle-letter-count">0</td></tr>
+          <tr class="obstacle-final-row"><th scope="row">CNV</th><td colspan="2"><input class="obstacle-full-answer" type="text" maxlength="5000" aria-label="Đáp án chướng ngại vật"></td><td class="obstacle-full-answer-count obstacle-letter-count">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
   <div id="databaseQuestions" class="database-questions" aria-live="polite"></div>
 </section>
 <section id="projectorView" class="hidden projector-page">
   <button id="projectorFullscreen" class="projector-fullscreen" type="button" aria-label="Bật âm thanh và toàn màn hình">BẬT ÂM THANH / TOÀN MÀN HÌNH</button>
   <div class="projector-stage">
-    <section class="projector-question-panel"><div id="projectorQuestion" class="projector-question">CÂU HỎI</div></section>
+    <section class="projector-question-panel"><div id="projectorQuestion" class="projector-question">CÂU HỎI</div><div id="projectorQuestionTimerBox" class="projector-question-timer-box hidden" aria-hidden="true"><span id="projectorQuestionTimer" class="projector-question-timer"></span></div></section>
     <section class="projector-score-panel"><div id="projectorScoreboard" class="projector-scoreboard"></div></section>
   </div>
 </section>

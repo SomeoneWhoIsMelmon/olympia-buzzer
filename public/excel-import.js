@@ -64,47 +64,79 @@ window.parseOlympiaWorkbook = async file => {
     ? [...sharedDocument.getElementsByTagNameNS('*', 'si')].map(item => [...item.getElementsByTagNameNS('*', 't')].map(node => node.textContent).join(''))
     : [];
   const normalizeSheetName = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/đ/g, 'd').trim();
-  const sheet = [...workbook.getElementsByTagNameNS('*', 'sheet')].find(item => normalizeSheetName(item.getAttribute('name')) === 'khoi dong');
-  if (!sheet) throw new Error('Không tìm thấy sheet “Khởi Động” trong workbook.');
-  const target = relationTargets.get(sheet.getAttribute('r:id'));
-  if (!target) throw new Error('Không tìm thấy dữ liệu của sheet “Khởi Động”.');
-  const worksheet = parseXml(normalizeTarget(target));
-  const valuesByCell = new Map();
-  for (const cell of worksheet.getElementsByTagNameNS('*', 'c')) {
-    const reference = cell.getAttribute('r');
-    if (!/^[CD](?:[4-9]|[1-9]\d|10\d|11[01])$/i.test(reference)) continue;
-    const type = cell.getAttribute('t');
-    let value = cell.getElementsByTagNameNS('*', 'v')[0]?.textContent || '';
-    if (type === 's') value = sharedStrings[Number(value)] || '';
-    else if (type === 'inlineStr') value = [...cell.getElementsByTagNameNS('*', 't')].map(node => node.textContent).join('');
-    valuesByCell.set(reference.toUpperCase(), value.trim());
-  }
-  const groups = [
-    { round: 'Thí sinh 1', start: 4, end: 23 },
-    { round: 'Thí sinh 2', start: 26, end: 45 },
-    { round: 'Thí sinh 3', start: 48, end: 67 },
-    { round: 'Thí sinh 4', start: 70, end: 89 },
-    { round: 'Lượt chung', start: 92, end: 111 }
-  ];
-  const results = [];
-  for (const group of groups) {
-    for (let row = group.start; row <= group.end; row++) {
-      const sourceCell = `C${row}`;
-      const answerCell = `D${row}`;
-      const prompt = valuesByCell.get(sourceCell) || '';
-      if (!prompt) continue;
-      results.push({
-        round: group.round,
-        prompt,
-        answer: valuesByCell.get(answerCell) || '',
-        notes: '',
-        points: 0,
-        sourceSheet: sheet.getAttribute('name') || 'Khởi Động',
-        sourceRow: row,
-        rawData: { 'Ô nguồn': sourceCell, 'Ô đáp án': answerCell }
-      });
+  const sheetsByName = new Map([...workbook.getElementsByTagNameNS('*', 'sheet')].map(sheet => [normalizeSheetName(sheet.getAttribute('name')), sheet]));
+  const readSheet = (name, optional = false) => {
+    const sheet = sheetsByName.get(normalizeSheetName(name));
+    if (!sheet) {
+      if (optional) return null;
+      throw new Error(`Không tìm thấy sheet “${name}” trong workbook.`);
+    }
+    const target = relationTargets.get(sheet.getAttribute('r:id'));
+    if (!target) throw new Error(`Không tìm thấy dữ liệu của sheet “${name}”.`);
+    const worksheet = parseXml(normalizeTarget(target));
+    const valuesByCell = new Map();
+    for (const cell of worksheet.getElementsByTagNameNS('*', 'c')) {
+      const reference = cell.getAttribute('r').toUpperCase();
+      const type = cell.getAttribute('t');
+      let value = cell.getElementsByTagNameNS('*', 'v')[0]?.textContent || '';
+      if (type === 's') value = sharedStrings[Number(value)] || '';
+      else if (type === 'inlineStr') value = [...cell.getElementsByTagNameNS('*', 't')].map(node => node.textContent).join('');
+      valuesByCell.set(reference, value.trim());
+    }
+    return { sheet, valuesByCell };
+  };
+  const openingData = readSheet('Khởi Động', true);
+  const speedData = readSheet('Tăng tốc B', true);
+  const obstacleData = readSheet('VCNV', true);
+  if (!openingData && !speedData && !obstacleData) throw new Error('Không tìm thấy sheet “Khởi Động”, “Tăng tốc B” hoặc “VCNV” trong workbook.');
+  const questions = [];
+  if (openingData) {
+    const groups = [
+      { round: 'Thí sinh 1', start: 4, end: 23 },
+      { round: 'Thí sinh 2', start: 26, end: 45 },
+      { round: 'Thí sinh 3', start: 48, end: 67 },
+      { round: 'Thí sinh 4', start: 70, end: 89 },
+      { round: 'Lượt chung', start: 92, end: 111 }
+    ];
+    for (const group of groups) {
+      for (let row = group.start; row <= group.end; row++) {
+        const sourceCell = `C${row}`;
+        const answerCell = `D${row}`;
+        const prompt = openingData.valuesByCell.get(sourceCell) || '';
+        if (!prompt) continue;
+        questions.push({
+          round: group.round,
+          prompt,
+          answer: openingData.valuesByCell.get(answerCell) || '',
+          notes: '',
+          points: 0,
+          sourceSheet: openingData.sheet.getAttribute('name') || 'Khởi Động',
+          sourceRow: row,
+          rawData: { 'Ô nguồn': sourceCell, 'Ô đáp án': answerCell }
+        });
+      }
     }
   }
-  if (!results.length) throw new Error('Không tìm thấy nội dung câu hỏi trong các ô đã chỉ định ở sheet “Khởi Động”.');
-  return results;
+  const speedQuestions = speedData ? Array.from({ length: 4 }, (_, index) => {
+    const row = index + 3;
+    return {
+      prompt: speedData.valuesByCell.get(`B${row}`) || '',
+      answer: speedData.valuesByCell.get(`C${row}`) || ''
+    };
+  }) : null;
+  const obstacleCourse = obstacleData ? {
+    rows: Array.from({ length: 4 }, (_, index) => {
+      const row = index + 3;
+      const answer = Array.from({ length: 15 }, (_, column) => obstacleData.valuesByCell.get(`${String.fromCharCode(66 + column)}${row}`) || '').join('');
+      return { answer, question: obstacleData.valuesByCell.get(`V${row}`) || '' };
+    }),
+    keyword: obstacleData.valuesByCell.get('B7') || '',
+    keywordQuestion: obstacleData.valuesByCell.get('V7') || '',
+    fullAnswer: obstacleData.valuesByCell.get('B8') || ''
+  } : null;
+  const hasObstacleCourse = obstacleCourse && (obstacleCourse.rows.some(row => row.answer || row.question) || obstacleCourse.keyword || obstacleCourse.keywordQuestion || obstacleCourse.fullAnswer);
+  if (!questions.length && !speedQuestions?.some(question => question.prompt || question.answer) && !hasObstacleCourse) {
+    throw new Error('Không tìm thấy câu hỏi hoặc đáp án trong các ô đã chỉ định ở ba sheet.');
+  }
+  return { questions, speedQuestions, obstacleCourse };
 };

@@ -5,7 +5,7 @@ const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { maxHttpBufferSize: 11 * 1024 * 1024 });
 const PORT = process.env.PORT || 3000;
 const rooms = new Map(); // Starter version: in-memory; rooms reset when server restarts.
 
@@ -126,7 +126,7 @@ io.on('connection', socket => {
       duration: Math.max(1, Math.min(300, Number(duration) || 5)),
       buzzerAlwaysOpen: false,
       teams: Array.isArray(teams) ? teams.slice(0, 12).map(t => clean(t, 20)).filter(Boolean) : ['Đội 1', 'Đội 2'],
-      players: new Map(), answers: [], buzzes: [], questions: [], spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingStartArmed: false, openingEmptyQuestionNumber: null, openingDeadline: null, openingTimer: null, openingTimerKind: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, buzzerCountdownDeadline: null, buzzerCountdownTimer: null, winnerCountdownDeadline: null, winnerCountdownTimer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, running: false, startedAt: null, handle: null }
+      players: new Map(), answers: [], buzzes: [], questions: [], speedQuestions: Array.from({ length: 4 }, () => ({ prompt: '', answer: '', media: null })), obstacleCourse: { rows: Array.from({ length: 4 }, () => ({ answer: '', question: '' })), keyword: '', keywordQuestion: '', fullAnswer: '' }, databaseAccessToken: null, spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingStartArmed: false, openingEmptyQuestionNumber: null, openingDeadline: null, openingTimer: null, openingTimerKind: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, buzzerCountdownDeadline: null, buzzerCountdownTimer: null, winnerCountdownDeadline: null, winnerCountdownTimer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, running: false, startedAt: null, handle: null }
     };
     if (!room.teams.length) room.teams = ['Đội 1', 'Đội 2'];
     rooms.set(roomCode, room); socket.join(roomCode);
@@ -141,6 +141,23 @@ io.on('connection', socket => {
     if (room.hostId && room.hostId !== socket.id && io.sockets.sockets.has(room.hostId)) return ack({ ok: false, error: 'Phòng đang có Host điều khiển.' });
     room.hostId = socket.id; socket.join(room.code); socket.data.roomCode = room.code; socket.data.role = 'host';
     ack({ ok: true, state: publicRoom(room) }); emitHostAnswers(room);
+  });
+  socket.on('host:database:token', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    room.databaseAccessToken ||= crypto.randomBytes(32).toString('hex');
+    ack({ ok: true, token: room.databaseAccessToken });
+  });
+  socket.on('host:database:join', ({ code: rawCode, token } = {}, ack = () => {}) => {
+    const room = rooms.get(clean(rawCode, 8).toUpperCase());
+    if (!room || typeof token !== 'string' || !/^[a-f0-9]{64}$/i.test(token) || !room.databaseAccessToken) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    const supplied = Buffer.from(token, 'hex');
+    const expected = Buffer.from(room.databaseAccessToken, 'hex');
+    if (!crypto.timingSafeEqual(supplied, expected)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    socket.data.roomCode = room.code;
+    socket.data.role = 'database';
+    socket.data.databaseToken = token;
+    ack({ ok: true, code: room.code });
   });
 
   socket.on('player:join', ({ code: rawCode, name, team } = {}, ack = () => {}) => {
@@ -435,6 +452,12 @@ io.on('connection', socket => {
     emitRoom(room); emitHostAnswers(room); ack({ ok: true });
   });
   function isHost(room) { return room && socket.data.role === 'host' && room.hostId === socket.id; }
+  function isDatabaseHost(room) {
+    if (isHost(room)) return true;
+    if (!room || socket.data.role !== 'database' || socket.data.roomCode !== room.code || typeof socket.data.databaseToken !== 'string' || !room.databaseAccessToken) return false;
+    const token = socket.data.databaseToken;
+    return /^[a-f0-9]{64}$/i.test(token) && crypto.timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(room.databaseAccessToken, 'hex'));
+  }
   function stopIndependentTimer(room, keepRemaining = true) {
     const t = room.independentTimer;
     if (t.handle) clearTimeout(t.handle);
@@ -503,28 +526,113 @@ io.on('connection', socket => {
   });
   socket.on('host:database:get', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
-    ack({ ok: true, questions: room.questions });
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    ack({ ok: true, questions: room.questions, speedQuestions: room.speedQuestions.map(slot => ({ prompt: slot.prompt, answer: slot.answer, media: slot.media ? { name: slot.media.name, type: slot.media.type, size: slot.media.size } : null })), obstacleCourse: room.obstacleCourse });
+  });
+  socket.on('host:database:obstacle-course:update', ({ row, answer, question, keyword, keywordQuestion, fullAnswer } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    if (row !== undefined) {
+      if (!Number.isInteger(row) || row < 0 || row >= room.obstacleCourse.rows.length || (answer === undefined && question === undefined) || (answer !== undefined && (typeof answer !== 'string' || answer.length > 64)) || (question !== undefined && (typeof question !== 'string' || question.length > 5000))) return ack({ ok: false, error: 'Dữ liệu hàng ngang không hợp lệ.' });
+      if (answer !== undefined) room.obstacleCourse.rows[row].answer = answer;
+      if (question !== undefined) room.obstacleCourse.rows[row].question = question;
+    } else {
+      if ((keyword === undefined && keywordQuestion === undefined && fullAnswer === undefined) || (keyword !== undefined && (typeof keyword !== 'string' || keyword.length > 5000)) || (keywordQuestion !== undefined && (typeof keywordQuestion !== 'string' || keywordQuestion.length > 5000)) || (fullAnswer !== undefined && (typeof fullAnswer !== 'string' || fullAnswer.length > 5000))) return ack({ ok: false, error: 'Đáp án chướng ngại vật không hợp lệ.' });
+      if (keyword !== undefined) room.obstacleCourse.keyword = keyword;
+      if (keywordQuestion !== undefined) room.obstacleCourse.keywordQuestion = keywordQuestion;
+      if (fullAnswer !== undefined) room.obstacleCourse.fullAnswer = fullAnswer;
+    }
+    ack({ ok: true, obstacleCourse: room.obstacleCourse });
+  });
+  socket.on('host:database:speed-question:update', ({ slot, prompt, answer } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    if (!Number.isInteger(slot) || slot < 0 || slot >= room.speedQuestions.length || (prompt === undefined && answer === undefined) || (prompt !== undefined && (typeof prompt !== 'string' || prompt.length > 5000)) || (answer !== undefined && (typeof answer !== 'string' || answer.length > 5000))) return ack({ ok: false, error: 'Câu hỏi hoặc đáp án Tăng tốc không hợp lệ.' });
+    if (prompt !== undefined) room.speedQuestions[slot].prompt = prompt;
+    if (answer !== undefined) room.speedQuestions[slot].answer = answer;
+    ack({ ok: true });
+  });
+  socket.on('host:database:speed-media:set', ({ slot, name, type, data } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    if (!Number.isInteger(slot) || slot < 0 || slot >= room.speedQuestions.length) return ack({ ok: false, error: 'Ô Tăng tốc không hợp lệ.' });
+    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 10 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 10 MB.' });
+    if (typeof type !== 'string' || !/^(image|video)\/[a-z0-9.+-]+$/i.test(type)) return ack({ ok: false, error: 'Chỉ hỗ trợ file ảnh hoặc video.' });
+    if (typeof name !== 'string' || !name.trim() || name.length > 255) return ack({ ok: false, error: 'Tên file media không hợp lệ.' });
+    const safeName = name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 255);
+    room.speedQuestions[slot].media = { name: safeName, type, size: data.length, data };
+    ack({ ok: true, media: { name: safeName, type, size: data.length } });
+  });
+  socket.on('host:database:speed-media:get', ({ slot } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    if (!Number.isInteger(slot) || slot < 0 || slot >= room.speedQuestions.length) return ack({ ok: false, error: 'Ô Tăng tốc không hợp lệ.' });
+    const media = room.speedQuestions[slot].media;
+    if (!media) return ack({ ok: false, error: 'Ô này chưa có media.' });
+    ack({ ok: true, media: { name: media.name, type: media.type, size: media.size, data: media.data } });
+  });
+  socket.on('host:database:speed-media:delete', ({ slot } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    if (!Number.isInteger(slot) || slot < 0 || slot >= room.speedQuestions.length) return ack({ ok: false, error: 'Ô Tăng tốc không hợp lệ.' });
+    room.speedQuestions[slot].media = null;
+    ack({ ok: true });
   });
   socket.on('host:database:clear', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     const deleted = room.questions.length;
     room.questions = [];
     ack({ ok: true, questions: room.questions, deleted });
   });
   socket.on('host:database:import', ({ questions } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     if (!Array.isArray(questions) || !questions.length || questions.length > 2000) return ack({ ok: false, error: 'File phải có từ 1 đến 2000 câu hỏi.' });
     const imported = questions.map(question => normalizeQuestion(question)).filter(Boolean);
     if (imported.length !== questions.length) return ack({ ok: false, error: 'Dữ liệu nhập có câu hỏi không hợp lệ.' });
     room.questions.push(...imported);
     ack({ ok: true, questions: room.questions, imported: imported.length });
   });
+  socket.on('host:database:import-document', ({ questions, speedQuestions, obstacleCourse } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    if (!Array.isArray(questions) || questions.length > 2000 || (speedQuestions !== null && (!Array.isArray(speedQuestions) || speedQuestions.length !== 4)) || (obstacleCourse !== null && obstacleCourse !== undefined && (!obstacleCourse || !Array.isArray(obstacleCourse.rows) || obstacleCourse.rows.length !== 4))) return ack({ ok: false, error: 'Dữ liệu workbook không hợp lệ.' });
+    const imported = questions.map(question => normalizeQuestion(question)).filter(Boolean);
+    if (imported.length !== questions.length) return ack({ ok: false, error: 'Dữ liệu câu hỏi Khởi Động không hợp lệ.' });
+    const normalizedSpeedQuestions = speedQuestions?.map(question => {
+      if (!question || typeof question.prompt !== 'string' || question.prompt.length > 5000 || typeof question.answer !== 'string' || question.answer.length > 5000) return null;
+      return { prompt: question.prompt, answer: question.answer };
+    });
+    const normalizedObstacleCourse = obstacleCourse ? {
+      rows: obstacleCourse.rows.map(row => {
+        if (!row || typeof row.answer !== 'string' || row.answer.length > 64 || typeof row.question !== 'string' || row.question.length > 5000) return null;
+        return { answer: row.answer, question: row.question };
+      }),
+      keyword: obstacleCourse.keyword,
+      keywordQuestion: obstacleCourse.keywordQuestion,
+      fullAnswer: obstacleCourse.fullAnswer
+    } : null;
+    if (normalizedSpeedQuestions?.some(question => !question) || normalizedObstacleCourse?.rows.some(row => !row) ||
+      (normalizedObstacleCourse && [normalizedObstacleCourse.keyword, normalizedObstacleCourse.keywordQuestion, normalizedObstacleCourse.fullAnswer].some(value => typeof value !== 'string' || value.length > 5000)) ||
+      (!imported.length && !normalizedSpeedQuestions?.some(question => question.prompt || question.answer) && !normalizedObstacleCourse?.rows.some(row => row.answer || row.question) && ![normalizedObstacleCourse?.keyword, normalizedObstacleCourse?.keywordQuestion, normalizedObstacleCourse?.fullAnswer].some(Boolean))) return ack({ ok: false, error: 'Dữ liệu câu hỏi trong workbook không hợp lệ hoặc workbook không có nội dung.' });
+    room.questions.push(...imported);
+    normalizedSpeedQuestions?.forEach((question, index) => {
+      room.speedQuestions[index].prompt = question.prompt;
+      room.speedQuestions[index].answer = question.answer;
+    });
+    if (normalizedObstacleCourse) room.obstacleCourse = normalizedObstacleCourse;
+    ack({
+      ok: true,
+      questions: room.questions,
+      imported: imported.length,
+      speedQuestions: room.speedQuestions.map(slot => ({ prompt: slot.prompt, answer: slot.answer, media: slot.media ? { name: slot.media.name, type: slot.media.type, size: slot.media.size } : null })),
+      obstacleCourse: normalizedObstacleCourse ? room.obstacleCourse : null
+    });
+  });
   socket.on('host:database:add', ({ question } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     const normalized = normalizeQuestion(question);
     if (!normalized) return ack({ ok: false, error: 'Nội dung câu hỏi không hợp lệ.' });
     room.questions.push(normalized);
@@ -532,7 +640,7 @@ io.on('connection', socket => {
   });
   socket.on('host:database:update', ({ id, question } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     const index = room.questions.findIndex(item => item.id === id);
     if (index < 0) return ack({ ok: false, error: 'Không tìm thấy câu hỏi.' });
     const normalized = normalizeQuestion(question, id);
@@ -542,7 +650,7 @@ io.on('connection', socket => {
   });
   socket.on('host:database:updateGroup', ({ questions } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     if (!Array.isArray(questions) || !questions.length || questions.length > 2000) return ack({ ok: false, error: 'Danh sách câu hỏi cần lưu không hợp lệ.' });
     const updates = [];
     const seenIds = new Set();
@@ -561,7 +669,7 @@ io.on('connection', socket => {
   });
   socket.on('host:database:delete', ({ id } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     const originalLength = room.questions.length;
     room.questions = room.questions.filter(item => item.id !== id);
     if (room.questions.length === originalLength) return ack({ ok: false, error: 'Không tìm thấy câu hỏi.' });
