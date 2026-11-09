@@ -88,7 +88,8 @@ window.parseOlympiaWorkbook = async file => {
   const openingData = readSheet('Khởi Động', true);
   const speedData = readSheet('Tăng tốc B', true);
   const obstacleData = readSheet('VCNV', true);
-  if (!openingData && !speedData && !obstacleData) throw new Error('Không tìm thấy sheet “Khởi Động”, “Tăng tốc B” hoặc “VCNV” trong workbook.');
+  const finishData = readSheet('Về đích', true);
+  if (!openingData && !speedData && !obstacleData && !finishData) throw new Error('Không tìm thấy sheet “Khởi Động”, “Tăng tốc B”, “VCNV” hoặc “Về đích” trong workbook.');
   const questions = [];
   if (openingData) {
     const groups = [
@@ -134,9 +135,20 @@ window.parseOlympiaWorkbook = async file => {
     keywordQuestion: obstacleData.valuesByCell.get('V7') || '',
     fullAnswer: obstacleData.valuesByCell.get('B8') || ''
   } : null;
+  const finishRowStarts = [4, 12, 20, 28];
+  const finishRounds = finishData ? finishRowStarts.map(startRow =>
+    Array.from({ length: 7 }, (_, index) => {
+      const row = startRow + index;
+      return {
+        question: finishData.valuesByCell.get(`C${row}`) || '',
+        answer: finishData.valuesByCell.get(`D${row}`) || ''
+      };
+    })
+  ) : null;
   const hasObstacleCourse = obstacleCourse && (obstacleCourse.rows.some(row => row.answer || row.question) || obstacleCourse.keyword || obstacleCourse.keywordQuestion || obstacleCourse.fullAnswer);
-  if (!questions.length && !speedQuestions?.some(question => question.prompt || question.answer) && !hasObstacleCourse) {
-    throw new Error('Không tìm thấy câu hỏi hoặc đáp án trong các ô đã chỉ định ở ba sheet.');
+  const hasFinishRounds = finishRounds?.some(round => round.some(item => item.question || item.answer));
+  if (!questions.length && !speedQuestions?.some(question => question.prompt || question.answer) && !hasObstacleCourse && !hasFinishRounds) {
+    throw new Error('Không tìm thấy câu hỏi hoặc đáp án trong các ô đã chỉ định ở các sheet.');
   }
-  return { questions, speedQuestions, obstacleCourse };
+  return { questions, openingSheetIncluded: Boolean(openingData), speedQuestions, obstacleCourse, finishSheetIncluded: Boolean(finishData), finishRounds };
 };

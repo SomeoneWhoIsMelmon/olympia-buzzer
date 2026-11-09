@@ -6,7 +6,7 @@
 Đội 2</textarea></label><button class="primary wide" id="createRoom">TẠO PHÒNG</button></section>
 <section id="playerSetup" class="panel hidden"><button class="back" data-back>← Quay lại</button><h2>Tham gia trận đấu</h2><label>Mã phòng<input id="joinCode" maxlength="8" placeholder="VD: A1B2C3" autocomplete="off"></label><label>Tên người chơi<input id="playerName" maxlength="24" placeholder="Tên của bạn"></label><label>Đội<select id="playerTeam"><option value="">Đợi tải danh sách đội…</option></select></label><button class="primary wide" id="joinRoom">THAM GIA</button></section>
 <section id="hostView" class="hidden host-page">
-  <div class="topline host-topline"><div><div class="eyebrow">MÃ PHÒNG</div><div class="roomcode" id="hostCode">------</div></div><div class="host-top-actions"><button class="secondary" id="openProjector">MÁY CHIẾU</button><button class="secondary" id="copyLink">SAO CHÉP LINK</button><button class="secondary" id="openDatabase">DATABASE</button></div></div>
+  <div class="topline host-topline"><div><div class="eyebrow">MÃ PHÒNG</div><div class="roomcode" id="hostCode">------</div></div><div class="host-top-actions"><button class="secondary" id="openProjector">MÁY CHIẾU</button><button class="secondary" id="copyLink">SAO CHÉP LINK</button><button class="secondary" id="openDatabase">DATABASE</button><div class="host-round-buttons" role="group" aria-label="Chọn vòng thi"><button class="secondary" type="button" data-host-round="intro" aria-pressed="false">Intro</button><button class="secondary is-active" type="button" data-host-round="opening" aria-pressed="true">Khởi động</button><button class="secondary" type="button" data-host-round="obstacle" aria-pressed="false">Vượt chướng ngại vật</button><button class="secondary" type="button" data-host-round="speed" aria-pressed="false">Tăng tốc</button><button class="secondary" type="button" data-host-round="finish" aria-pressed="false">Về đích</button><button class="secondary" type="button" data-host-round="bonus" aria-pressed="false">Câu hỏi phụ</button></div></div></div>
   <div class="host-layout">
     <div class="host-question-row">
       <textarea id="hostQuestionInput" class="question-display host-question" rows="2" maxlength="500" placeholder="NHẬP CÂU HỎI"></textarea>
@@ -47,13 +47,13 @@
       <div class="winner" id="hostWinner">Chưa có người bấm chuông</div>
       <div class="host-round-settings">
         <label class="buzzer-duration">Thời gian mở chuông (giây)<input id="duration" type="number" min="1" max="300" value="5"></label>
-        <label class="toggleline"><input id="alwaysOpen" type="checkbox"> Chuông luôn mở <small class="muted">(một người bấm không khóa chuông của người khác)</small></label>
+        <label class="toggleline"><input id="alwaysOpen" type="checkbox" checked> Chuông luôn mở <small class="muted">(một người bấm không khóa chuông của người khác)</small></label>
       </div>
       <div class="controls"><button class="primary" id="startRound">MỞ CHUÔNG</button><button class="secondary" id="startRoundDelayed">MỞ CHUÔNG SAU 5S</button><button class="secondary" id="lockRound">KHÓA</button><button class="secondary" id="resetRound">RESET</button></div>
     </div>
     <div class="panel host-answers-panel"><div class="answerhead"><div><h2>Câu trả lời mới nhất của mỗi thí sinh</h2><p class="muted">Thời gian tính từ lúc Host mở lượt.</p></div><span id="answerCount" class="muted">0 câu trả lời</span></div><div id="hostAnswers" class="answers"><p class="muted">Chưa có câu trả lời.</p></div></div>
     <div class="panel host-buzzes-panel"><div class="answerhead"><div><h2>Lịch sử bấm chuông</h2><p class="muted">Thứ tự theo thời điểm máy chủ nhận tín hiệu.</p></div><span id="buzzCount" class="muted">0 lượt</span></div><div id="hostBuzzes" class="answers"><p class="muted">Chưa có thí sinh bấm chuông.</p></div></div>
-    <div class="independent-clock host-clock"><div class="independent-title"><div><h2>THỜI GIAN TRẢ LỜI</h2><p class="muted">Đồng hồ riêng cho ô trả lời của thí sinh.</p></div><strong id="hostIndependentDisplay">01:00</strong></div><div class="independent-controls"><label>Thời gian trả lời (giây)<input id="independentDuration" type="number" min="1" max="3600" value="60"></label><button class="primary" id="independentStart">BẮT ĐẦU</button><button class="secondary" id="independentPause">TẠM DỪNG</button><button class="secondary" id="independentReset">ĐẶT LẠI</button><button class="secondary answer-reveal-trigger" id="revealLatestAnswers" type="button">HIỆN ĐÁP ÁN</button></div></div>
+    <div class="independent-clock host-clock"><div class="independent-title"><div><h2>THỜI GIAN TRẢ LỜI</h2><p class="muted">Đồng hồ riêng cho ô trả lời của thí sinh.</p></div><strong id="hostIndependentDisplay">01:00</strong></div><div class="independent-controls"><label><input id="independentDuration" type="number" min="1" max="3600" value="60" aria-label="Thời gian trả lời bằng giây"></label><div class="independent-presets" aria-label="Thời lượng nhanh"><button class="secondary" type="button" data-independent-seconds="15">15s VCNV</button><button class="secondary" type="button" data-independent-seconds="20">20s TT</button><button class="secondary" type="button" data-independent-seconds="30">30s TT</button><button class="secondary" type="button" data-independent-seconds="40">40s TT</button></div><button class="primary" id="independentStart">BẮT ĐẦU</button><button class="secondary" id="independentPause">TẠM DỪNG</button><button class="secondary" id="independentReset">ĐẶT LẠI</button><button class="secondary answer-reveal-trigger" id="revealLatestAnswers" type="button">HIỆN ĐÁP ÁN</button><select id="speedQuestionSelect" aria-label="Chọn câu tăng tốc"><option value="">Chọn câu tăng tốc</option></select><button class="secondary" id="openSpeedQuestion" type="button">MỞ CÂU HỎI</button></div></div>
   </div>
 </section>
 <section id="hostDatabase" class="hidden database-page">
@@ -67,7 +67,7 @@
     <button class="secondary" id="clearDatabase" type="button" disabled>XÓA TOÀN BỘ</button>
     <span id="databaseCount" class="muted" aria-live="polite">0 câu hỏi</span>
   </div>
-  <p class="database-import-note">Đọc câu hỏi Khởi Động từ C4:C23, C26:C45, C48:C67, C70:C89 và C92:C111 (đáp án ở cột D); câu hỏi Tăng tốc từ B3:B6 và đáp án từ C3:C6 trong sheet “Tăng tốc B”; bảng Vượt chướng ngại vật từ sheet “VCNV”.</p>
+  <p class="database-import-note">Sheet “Khởi động” đọc câu hỏi ở cột C và đáp án tương ứng ở cột D vào 5 bảng Khởi Động; mỗi lần nhập sẽ thay thế câu hỏi hiện có trong 5 bảng. Sheet “Về đích” đọc C4:C10, C12:C18, C20:C26, C28:C34 cùng đáp án tương ứng ở cột D vào 4 bảng Về đích. Các nút chọn lượt, bắt đầu, chuyển câu và chấm đáp án sử dụng trực tiếp những câu hỏi Khởi Động này. Câu hỏi Tăng tốc được đọc từ B3:B6 và đáp án từ C3:C6 trong sheet “Tăng tốc B”; bảng Vượt chướng ngại vật đọc từ sheet “VCNV”.</p>
   <div id="speedQuestionSlots" class="database-speed-grid" aria-label="Câu hỏi Tăng tốc">
     <article class="database-speed-card" data-speed-slot="0">
       <h2>Tăng tốc 1</h2>
@@ -99,7 +99,8 @@
     </article>
   </div>
   <section id="databaseObstacleCourse" class="database-obstacle-course" aria-labelledby="obstacleCourseTitle">
-    <h2 id="obstacleCourseTitle">Vượt chướng ngại vật</h2>
+    <div class="database-obstacle-heading"><h2 id="obstacleCourseTitle">Vượt chướng ngại vật</h2><div class="database-obstacle-media-controls"><button class="secondary" id="obstacleMediaButton" type="button">CHỌN MEDIA</button><input id="obstacleMediaFile" type="file" accept="image/*,video/*" hidden><span id="obstacleMediaName" class="muted">Tối đa 10 MB</span></div></div>
+    <div id="obstacleMediaPreview" class="database-obstacle-media-preview"><span>Media VCNV</span></div>
     <div class="database-obstacle-scroll">
       <table class="database-obstacle-table">
         <colgroup><col class="obstacle-index-column"><col class="obstacle-letters-column"><col class="obstacle-question-column"><col class="obstacle-count-column"></colgroup>
@@ -115,6 +116,7 @@
       </table>
     </div>
   </section>
+  <div id="databaseFinishRounds" class="database-finish-rounds" aria-label="Các bảng Về đích"></div>
   <div id="databaseQuestions" class="database-questions" aria-live="polite"></div>
 </section>
 <section id="projectorView" class="hidden projector-page">
@@ -128,7 +130,7 @@
   <div class="topline player-topline"><div><div class="eyebrow">PHÒNG</div><div class="roomcode" id="playerRoomCode">------</div></div><div class="teamtag" id="myTeam"></div></div>
   <div class="panel playpanel player-layout">
     <div class="player-statusline"><span id="playerStatus" class="status">ĐANG CHỜ</span><span id="playerTimer" class="timer">--</span></div>
-    <div class="question-display" id="questionDisplay"><span>CÂU HỎI</span></div>
+    <div class="question-display" id="questionDisplay"><span id="questionDisplayText" class="question-display-text">CÂU HỎI</span><div id="questionDisplayMedia" class="question-display-media hidden"></div></div>
     <div class="panel player-score-panel"><h2>Bảng điểm</h2><div id="playerScoreboard" class="players"></div></div>
     <form id="answerForm" class="answer-entry">
       <textarea id="answerInput" rows="1" maxlength="500" placeholder="NHẬP ĐÁP ÁN" disabled></textarea>
