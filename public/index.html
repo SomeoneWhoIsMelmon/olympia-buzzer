@@ -39,6 +39,32 @@
           <button id="openingAnswerIncorrect" type="button" disabled>SAI (↓)</button>
         </div>
       </div>
+      <div class="finish-round-layout hidden">
+        <div class="finish-question-choice-area">
+          <div class="finish-question-choice-grid" role="group" aria-label="Chọn mức điểm cho từng câu hỏi">
+            <span class="finish-choice-corner"></span>
+            <span class="finish-question-number">1</span><span class="finish-question-number">2</span><span class="finish-question-number">3</span><span class="finish-question-number">4</span>
+            <span class="finish-points-label">20</span>
+            <input type="radio" name="finish-question-1" value="20" aria-label="Câu 1, 20 điểm"><input type="radio" name="finish-question-2" value="20" aria-label="Câu 2, 20 điểm"><input type="radio" name="finish-question-3" value="20" aria-label="Câu 3, 20 điểm"><input type="radio" name="finish-question-4" value="20" aria-label="Câu 4, 20 điểm">
+            <span class="finish-points-label">30</span>
+            <input type="radio" name="finish-question-1" value="30" aria-label="Câu 1, 30 điểm"><input type="radio" name="finish-question-2" value="30" aria-label="Câu 2, 30 điểm"><input type="radio" name="finish-question-3" value="30" aria-label="Câu 3, 30 điểm"><input type="radio" name="finish-question-4" value="30" aria-label="Câu 4, 30 điểm">
+            <span class="finish-points-label">40</span>
+            <input type="radio" name="finish-question-1" value="40" aria-label="Câu 1, 40 điểm"><input type="radio" name="finish-question-2" value="40" aria-label="Câu 2, 40 điểm"><input type="radio" name="finish-question-3" value="40" aria-label="Câu 3, 40 điểm"><input type="radio" name="finish-question-4" value="40" aria-label="Câu 4, 40 điểm">
+          </div>
+          <label class="finish-round-select">Lượt thi<select id="finishRoundSelect" aria-label="Chọn lượt thi Về đích"><option value="">Chọn lượt thi…</option><option value="0">Về đích 1</option><option value="1">Về đích 2</option><option value="2">Về đích 3</option><option value="3">Về đích 4</option></select></label>
+          <label class="finish-player-select">Thí sinh được chọn<select id="finishPlayerSelect" aria-label="Chọn thí sinh Về đích"><option value="">Không chọn thí sinh</option></select></label>
+        </div>
+        <div class="finish-round-start-actions">
+          <button class="secondary" id="startFinishRound" type="button" disabled>Start</button>
+          <button class="secondary" id="waitFinishRound" type="button">Chốt</button>
+        </div>
+        <div class="finish-round-action-grid">
+          <button class="secondary" type="button">End</button><button class="secondary" type="button">15s</button><button class="secondary" type="button">20s</button><button class="secondary" type="button">30s</button>
+          <button class="secondary" type="button">NSHV</button><button class="secondary" type="button">Blank (B)</button><button class="secondary" type="button">Đúng (C)</button><button class="secondary" type="button">Sai (X)</button>
+          <button class="secondary finish-question-nav" type="button">NextQs (→)</button><button class="secondary finish-question-nav" type="button">PrevQs (←)</button>
+          <label class="finish-allow-option"><input id="finishAllowFortyQuestionFour" type="checkbox">Cho phép chọn câu 40 điểm và câu số 4</label>
+        </div>
+      </div>
     </div>
     <div class="panel host-score-panel"><div class="scorehead"><h2>Bảng điểm</h2><span id="playerCount" class="muted">0 người</span></div><div id="hostPlayers" class="players"></div></div>
     <div class="panel host-controls-panel">

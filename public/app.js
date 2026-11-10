@@ -56,6 +56,7 @@ window.addEventListener('blur',reportPlayerFocus);
 document.addEventListener('visibilitychange',reportPlayerFocus);
 document.addEventListener('keydown',event=>{
  if(role!=='host'||$('hostView').classList.contains('hidden')||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
+ if(latest?.roundMode!=='opening')return;
  if(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
  const buttons={ArrowUp:$('openingAnswerCorrect'),ArrowDown:$('openingAnswerIncorrect'),ArrowRight:$('nextOpeningQuestion'),ArrowLeft:$('previousOpeningQuestion'),z:$('startFiveSecondTimer'),Z:$('startFiveSecondTimer'),b:$('playBlankSound'),B:$('playBlankSound')};
  const button=buttons[event.key];
@@ -72,6 +73,9 @@ $('hostView').querySelectorAll('[data-host-round]').forEach(button=>button.addEv
  if(!result.ok)toast(result.error);
  else updateHostRoundButtons(data.round);
 }));
+$('finishPlayerSelect').addEventListener('change',()=>{$('startFinishRound').disabled=!$('finishPlayerSelect').value;});
+$('finishAllowFortyQuestionFour').addEventListener('change',updateFinishQuestionChoices);
+updateFinishQuestionChoices();
 function updateHostRoundButtons(round){
  $('hostView').querySelectorAll('[data-host-round]').forEach(button=>{
   const active=button.dataset.hostRound===round;
@@ -79,6 +83,24 @@ function updateHostRoundButtons(round){
   button.setAttribute('aria-pressed',String(active));
  });
  $('hostView').querySelector('.opening-question-layout').classList.toggle('hidden',round!=='opening');
+ $('hostView').querySelector('.finish-round-layout').classList.toggle('hidden',round!=='finish');
+ $('hostView').querySelector('.host-future-panel').classList.toggle('finish-round-active',round==='finish');
+}
+function refreshFinishControls(state){
+ const select=$('finishPlayerSelect'),selected=select.value;
+ const options=[['','Không chọn thí sinh'],...(state?.players||[]).map(player=>[player.id,`${player.name} · ${player.team}`])];
+ if(select.options.length!==options.length||options.some(([value,label],index)=>select.options[index]?.value!==value||select.options[index]?.textContent!==label)){
+  select.replaceChildren(...options.map(([value,label])=>{const option=document.createElement('option');option.value=value;option.textContent=label;return option;}));
+ }
+ select.value=options.some(([value])=>value===selected)?selected:'';
+ $('startFinishRound').disabled=!select.value;
+}
+function updateFinishQuestionChoices(){
+ const allowFortyQuestionFour=$('finishAllowFortyQuestionFour').checked;
+ $('hostView').querySelectorAll('.finish-question-choice-grid input[type="radio"]').forEach(input=>{
+  input.disabled=!allowFortyQuestionFour&&(input.value==='40'||input.name==='finish-question-4');
+  if(input.disabled)input.checked=false;
+ });
 }
 function renderSpeedQuestionSelect(){
  const select=$('speedQuestionSelect');
@@ -414,7 +436,7 @@ function render(state){
  renderBase(state);
  if(!state)return;
  if(role==='player')renderPlayerQuestion(state);
- if(role==='host')updateHostRoundButtons(state.roundMode||'opening');
+ if(role==='host'){updateHostRoundButtons(state.roundMode||'opening');refreshFinishControls(state);}
  if(role==='host')setOpeningNavigationEnabled(Boolean(state.openingQuestionRound&&Number.isInteger(state.openingQuestionIndex)));
  if(role==='host'){refreshSpotlightControls(state);syncHostOpeningAnswer(state);applySpotlightClass($('hostPlayers'),state.players);}
  else if(role==='player')applySpotlightClass($('playerScoreboard'),[...state.players].sort((a,b)=>b.score-a.score));
