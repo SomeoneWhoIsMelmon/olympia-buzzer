@@ -573,6 +573,12 @@ io.on('connection', socket => {
     io.to(room.code).emit('player:answer:reveal', { answers });
     ack({ ok: true, count: answers.length });
   });
+  socket.on('host:answer:hide', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    io.to(room.code).emit('projector:answer:hide');
+    ack({ ok: true });
+  });
   socket.on('host:database:get', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });

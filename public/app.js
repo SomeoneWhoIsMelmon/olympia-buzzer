@@ -78,6 +78,7 @@ function updateHostRoundButtons(round){
   button.classList.toggle('is-active',active);
   button.setAttribute('aria-pressed',String(active));
  });
+ $('hostView').querySelector('.opening-question-layout').classList.toggle('hidden',round!=='opening');
 }
 function renderSpeedQuestionSelect(){
  const select=$('speedQuestionSelect');
@@ -359,15 +360,28 @@ $('hostView').querySelectorAll('[data-independent-seconds]').forEach(button=>but
 $('independentPause').onclick=async()=>{const r=await emitAck('host:independent:pause');if(!r.ok)toast(r.error);};
 $('independentReset').onclick=async()=>{const r=await emitAck('host:independent:reset');if(!r.ok)toast(r.error);};
 $('revealLatestAnswers').onclick=async()=>{
+ const button=$('revealLatestAnswers');
+ if(button.dataset.projectorOpen==='true'){
+  const result=await emitAck('host:answer:hide');
+  if(!result.ok)return toast(result.error);
+  button.dataset.projectorOpen='false';
+  button.textContent='HIỆN ĐÁP ÁN';
+  button.classList.remove('is-answer-reveal-open');
+  return;
+ }
  const soundType=latest?.roundMode==='obstacle'?'showAnswerVCNV':'showAnswerTT';
  const soundResult=await emitAck('host:opening:audio',{type:soundType});
  if(!soundResult.ok)return toast(soundResult.error);
  const result=await emitAck('host:answer:reveal');
  if(!result.ok)return toast(result.error);
+ button.dataset.projectorOpen='true';
+ button.textContent='ĐÓNG ĐÁP ÁN';
+ button.classList.add('is-answer-reveal-open');
  toast(result.count?`Đã hiện đáp án mới nhất cho ${result.count} thí sinh.`:'Chưa có thí sinh gửi câu trả lời.');
 };
 $('closeAnswerReveal').onclick=()=>$('answerRevealDialog').close();
-socket.on('player:answer:reveal',({answers}={})=>{if(role!=='player'||!Array.isArray(answers))return;const list=$('revealedAnswers');list.replaceChildren();if(!answers.length){const empty=document.createElement('p');empty.className='revealed-answers-empty';empty.textContent='Chưa có thí sinh gửi câu trả lời.';list.append(empty);}else{answers.forEach(item=>{if(!item||typeof item.name!=='string'||typeof item.team!=='string'||typeof item.answer!=='string'||!Number.isFinite(item.elapsedMs))return;const entry=document.createElement('article');entry.className='revealed-answer';const heading=document.createElement('div');heading.className='revealed-answer-heading';const player=document.createElement('strong');player.textContent=`${item.name} · ${item.team}`;const time=document.createElement('time');time.textContent=formatElapsed(item.elapsedMs);heading.append(player,time);const answer=document.createElement('p');answer.textContent=item.answer;entry.append(heading,answer);list.append(entry);});} $('answerRevealDialog').showModal();});
+socket.on('player:answer:reveal',({answers}={})=>{if(!['player','projector'].includes(role)||!Array.isArray(answers))return;const list=$('revealedAnswers');list.replaceChildren();if(!answers.length){const empty=document.createElement('p');empty.className='revealed-answers-empty';empty.textContent='Chưa có thí sinh gửi câu trả lời.';list.append(empty);}else{answers.forEach(item=>{if(!item||typeof item.name!=='string'||typeof item.team!=='string'||typeof item.answer!=='string'||!Number.isFinite(item.elapsedMs))return;const entry=document.createElement('article');entry.className='revealed-answer';const heading=document.createElement('div');heading.className='revealed-answer-heading';const player=document.createElement('strong');player.textContent=`${item.name} · ${item.team}`;const time=document.createElement('time');time.textContent=formatElapsed(item.elapsedMs);heading.append(player,time);const answer=document.createElement('p');answer.textContent=item.answer;entry.append(heading,answer);list.append(entry);});} $('answerRevealDialog').showModal();});
+socket.on('projector:answer:hide',()=>{if(role==='projector'&&$('answerRevealDialog').open)$('answerRevealDialog').close();});
 $('copyLink').onclick=async()=>{try{await navigator.clipboard.writeText(hostLink);toast('Đã sao chép link tham gia.');}catch(e){toast(hostLink);}};
 $('projectorVolume').addEventListener('input',()=>{
  const volume=Number($('projectorVolume').value)/100;
@@ -407,7 +421,8 @@ function render(state){
  else if(role==='projector')applySpotlightClass($('projectorScoreboard'),[...state.players].sort((a,b)=>b.score-a.score));
 }
 function renderPlayerQuestion(state){
- const display=$('questionDisplay'),text=$('questionDisplayText'),media=$('questionDisplayMedia');
+ const projector=role==='projector';
+ const display=$(projector?'projectorPlayerQuestion':'questionDisplay'),text=$(projector?'projectorPlayerQuestionText':'questionDisplayText'),media=$(projector?'projectorPlayerQuestionMedia':'questionDisplayMedia');
  const mediaRound=(state.roundMode==='obstacle'||state.roundMode==='speed')&&Boolean(activeRoundMedia);
  display.classList.toggle('round-media-active',mediaRound);
  text.textContent=state.question||'CÂU HỎI';
@@ -448,8 +463,8 @@ function renderPlayerQuestion(state){
  if(element instanceof HTMLVideoElement&&pendingSpeedVideoPlayback)startPlayerSpeedVideo(element);
 }
 socket.on('round:video:play',()=>{
- if(role!=='player'||latest?.roundMode!=='speed')return;
- const video=$('questionDisplayMedia').querySelector('video');
+ if(!['player','projector'].includes(role)||latest?.roundMode!=='speed')return;
+ const video=$(role==='projector'?'projectorPlayerQuestionMedia':'questionDisplayMedia').querySelector('video');
  pendingSpeedVideoPlayback=true;
  if(video)startPlayerSpeedVideo(video);
 });
@@ -478,7 +493,7 @@ function playSpeedVideo(video){
  video.play().catch(error=>{if(error.name!=='AbortError')toast(`Không thể phát video câu Tăng tốc: ${error.message}`);});
 }
 socket.on('round:media',media=>{
- if(role!=='player')return;
+ if(!['player','projector'].includes(role))return;
  activeRoundMedia=media&&typeof media.data!=='undefined'?media:null;
  activeRoundMediaVersion++;
  if(latest)renderPlayerQuestion(latest);
@@ -507,7 +522,7 @@ function syncHostOpeningAnswer(state){
  const questions=databaseQuestions.filter(question=>question.round===state.openingQuestionRound).sort((a,b)=>(a.sourceRow||0)-(b.sourceRow||0));
  $('hostAnswerNote').value=questions[state.openingQuestionIndex]?.answer||'';
 }
-function renderProjector(state){$('projectorQuestion').textContent=state.question||'CÂU HỎI';fitProjectorQuestion();const board=$('projectorScoreboard');board.innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;const players=[...state.players].sort((a,b)=>b.score-a.score);if(!players.length){const empty=document.createElement('p');empty.className='projector-empty';empty.textContent='Đang chờ thí sinh';board.append(empty);}else{players.forEach(p=>{const row=document.createElement('div');row.className='projector-player';if(p.id===fastestId)row.classList.add('fastest-buzzer');const identity=document.createElement('div');identity.className='projector-player-identity';const name=document.createElement('strong');name.textContent=p.name;identity.append(name);const score=document.createElement('strong');score.className='projector-player-score';score.textContent=p.score;row.append(identity,score);board.append(row);});}scaleProjectorScoreboard();}
+function renderProjector(state){const playerRound=state.roundMode==='obstacle'||state.roundMode==='speed';$('projectorView').classList.toggle('projector-round-player-mode',playerRound);$('projectorQuestion').textContent=state.question||'CÂU HỎI';fitProjectorQuestion();const board=$('projectorScoreboard');board.innerHTML='';const projectorPlayerBoard=$('projectorPlayerScoreboard');projectorPlayerBoard.innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;const players=[...state.players].sort((a,b)=>b.score-a.score);if(!players.length){const empty=document.createElement('p');empty.className='projector-empty';empty.textContent='Đang chờ thí sinh';board.append(empty);const playerEmpty=document.createElement('p');playerEmpty.className='muted';playerEmpty.textContent='Đang chờ thí sinh';projectorPlayerBoard.append(playerEmpty);}else{players.forEach(p=>{const row=document.createElement('div');row.className='projector-player';if(p.id===fastestId)row.classList.add('fastest-buzzer');const identity=document.createElement('div');identity.className='projector-player-identity';const name=document.createElement('strong');name.textContent=p.name;identity.append(name);const score=document.createElement('strong');score.className='projector-player-score';score.textContent=p.score;row.append(identity,score);board.append(row);projectorPlayerBoard.append(scoreRow(p,false,p.id===fastestId));});}scaleProjectorScoreboard();renderPlayerQuestion(state);applySpotlightClass(projectorPlayerBoard,players);}
 function fastestBuzzerId(buzzes=[]){return buzzes[0]?.playerId||null;}
 function fitProjectorQuestion(){const question=$('projectorQuestion');if(!question||!question.clientWidth||!question.clientHeight)return;question.style.removeProperty('font-size');const baseSize=parseFloat(getComputedStyle(question).fontSize),measure=document.createElement('div');measure.textContent=question.textContent;Object.assign(measure.style,{position:'fixed',left:'-100000px',top:'0',width:`${question.clientWidth}px`,height:'auto',minHeight:'0',maxHeight:'none',overflow:'visible',display:'block',flex:'none',padding:'0',border:'0',whiteSpace:'pre-wrap',overflowWrap:'anywhere',lineHeight:'1.2',fontFamily:getComputedStyle(question).fontFamily});document.body.append(measure);let low=.5,high=baseSize;for(let i=0;i<18;i++){const size=(low+high)/2;measure.style.fontSize=`${size}px`;if(measure.scrollHeight<=question.clientHeight)low=size;else high=size;}question.style.fontSize=`${low>=baseSize-.1?baseSize:low}px`;measure.remove();}
 function scaleProjectorScoreboard(){if(!$('projectorView')||$('projectorView').classList.contains('hidden'))return;const panel=document.querySelector('.projector-score-panel'),board=$('projectorScoreboard');if(!panel||!board)return;const players=board.querySelectorAll('.projector-player');if(!players.length){board.style.setProperty('--projector-rows','1');board.style.setProperty('--projector-scale','1');return;}const rowHeight=board.clientHeight/players.length,scale=Math.max(.15,Math.min(1,rowHeight/148.5,board.clientWidth/607.5));board.style.setProperty('--projector-rows',String(players.length));board.style.setProperty('--projector-scale',String(scale));}
@@ -747,7 +762,7 @@ async function saveRoundQuestion(round,index,existing,prompt,answer){
  refreshSpotlightControls(latest);syncHostOpeningAnswer(latest);
 }
 function formatClock(ms){const total=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;}
-function updateIndependentTimer(){const t=latest&&latest.independentTimer;if(!t)return;const remaining=t.running&&t.deadline?Math.max(0,t.deadline-Date.now()):t.remainingMs;if($('hostIndependentDisplay'))$('hostIndependentDisplay').textContent=formatClock(remaining);if($('playerIndependentDisplay'))$('playerIndependentDisplay').textContent=formatClock(remaining);if($('independentReset'))$('independentReset').disabled=Boolean(t.running&&remaining>0);if(role==='player'&&remaining<=0){$('answerInput').disabled=true;$('submitAnswer').disabled=true;}}
+function updateIndependentTimer(){const t=latest&&latest.independentTimer;if(!t)return;const remaining=t.running&&t.deadline?Math.max(0,t.deadline-Date.now()):t.remainingMs;if($('hostIndependentDisplay'))$('hostIndependentDisplay').textContent=formatClock(remaining);if($('playerIndependentDisplay'))$('playerIndependentDisplay').textContent=formatClock(remaining);if($('projectorIndependentDisplay'))$('projectorIndependentDisplay').textContent=formatClock(remaining);if($('independentReset'))$('independentReset').disabled=Boolean(t.running&&remaining>0);if(role==='player'&&remaining<=0){$('answerInput').disabled=true;$('submitAnswer').disabled=true;}}
 function updateTimer(){
  clearInterval(tickHandle);
  const paint=()=>{
