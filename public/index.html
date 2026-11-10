@@ -56,12 +56,13 @@
         </div>
         <div class="finish-round-start-actions">
           <button class="secondary" id="startFinishRound" type="button" disabled>Start</button>
-          <button class="secondary" id="waitFinishRound" type="button">Chốt</button>
+          <button class="secondary" id="waitFinishRound" type="button" disabled>Chốt</button>
         </div>
         <div class="finish-round-action-grid">
-          <button class="secondary" type="button">End</button><button class="secondary" type="button">15s</button><button class="secondary" type="button">20s</button><button class="secondary" type="button">30s</button>
-          <button class="secondary" type="button">NSHV</button><button class="secondary" type="button">Blank (B)</button><button class="secondary" type="button">Đúng (C)</button><button class="secondary" type="button">Sai (X)</button>
-          <button class="secondary finish-question-nav" type="button">NextQs (→)</button><button class="secondary finish-question-nav" type="button">PrevQs (←)</button>
+          <button class="secondary" id="endFinishRound" type="button">End</button><button class="secondary" id="finishTimer15" type="button">15s</button><button class="secondary" id="finishTimer20" type="button">20s</button><button class="secondary" id="finishTimer30" type="button">30s</button>
+          <button class="secondary" id="finishNshv" type="button" aria-pressed="false">NSHV</button><button class="secondary" id="finishBlank" type="button">Blank (B)</button><button class="secondary" id="finishCorrect" type="button">Đúng (C)</button><button class="secondary" id="finishWrong" type="button">Sai (X)</button>
+          <button class="secondary finish-question-nav" id="nextFinishQuestion" type="button" disabled>NextQs (→)</button><button class="secondary finish-question-nav" id="previousFinishQuestion" type="button" disabled>PrevQs (←)</button>
+          <button class="secondary" id="finishQuestionPointsDisplay" type="button">Câu ... điểm</button>
           <label class="finish-allow-option"><input id="finishAllowFortyQuestionFour" type="checkbox">Cho phép chọn câu 40 điểm và câu số 4</label>
         </div>
       </div>

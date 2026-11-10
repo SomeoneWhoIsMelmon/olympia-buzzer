@@ -4,15 +4,19 @@ const views = ['home','hostSetup','playerSetup','hostView','hostDatabase','playe
 let role = null, roomCode = null, myId = null, myTeam = null, latest = null, hostLink = null, lastStatus = null, audioCtx = null, projectorMasterGain = null, projectorVolume = 1, tickHandle = null, independentTickHandle = setInterval(updateIndependentTimer, 100), projectorAudioQueue = [], projectorAudioBuffers = new Map(), projectorAudioReady = false, projectorAudioLoading = new Map(), projectorAudioResumePending = false, projectorOpeningMusicSource = null, projectorOpeningMusicKey = null, projectorOpeningMusicGeneration = 0, databaseQuestions = [], speedQuestionSlots = Array.from({length:4},()=>({prompt:'',media:null})), obstacleCourse = {rows:Array.from({length:4},()=>({answer:'',question:''})),keyword:'',fullAnswer:'',media:null}, speedMediaObjectUrls = Array(4).fill(null), speedMediaLoadVersions = Array(4).fill(0), obstacleMediaObjectUrl = null, activeRoundMediaObjectUrl = null, activeRoundMedia = null, activeRoundMediaVersion = 0, videoPlaybackRequestId = 0, pendingSpeedVideoPlayback = false, openingCorrectStreak = 0, openingStreakPlayerId = '', openingScorePending = false, activeSpeedQuestionSlot = null;
 let finishRounds = Array.from({length:4},()=>Array.from({length:7},()=>({question:'',answer:''})));
 let obstacleMediaLoadVersion = 0;
+let serverClockOffsetMs = 0, serverClockSynchronized = false;
+const finishAudioFiles={startVDCombined:'StartVDCombined.mp3',startTurnVD:'StartTurnVD.mp3',vd15:'VD15s.mp3',vd20:'VD20s.mp3',vd30:'VD30s.mp3',nshv:'NSHV.mp3',finishCorrect:'Correct.mp3',finishWrong:'FiveSecsForOtherContestants.mp3',endTurnVD:'EndTurnVD.mp3'};
 function show(id){ views.forEach(v => $(v).classList.toggle('hidden',v!==id)); document.body.classList.toggle('player-active',id==='playerView'); document.body.classList.toggle('host-active',id==='hostView'||id==='hostDatabase'); document.body.classList.toggle('database-page-active',id==='hostDatabase'); document.body.classList.toggle('projector-active',id==='projectorView'); }
 function toast(msg){ $('toast').textContent=msg; $('toast').classList.remove('hidden'); setTimeout(()=>$('toast').classList.add('hidden'),2600); }
-function canPlayerBuzz(){if(role!=='player'||!latest||latest.status!=='playing'||latest.buzzerCountdownDeadline||!latest.deadline||Date.now()>=latest.deadline)return false;const me=latest.players.find(player=>player.id===myId);return latest.buzzerAlwaysOpen?!Boolean(me&&me.buzzedAt):!latest.winnerId;}
+function displayNow(){return serverClockSynchronized?performance.now()+serverClockOffsetMs:Date.now();}
+function syncServerClock(){if(!socket.connected)return;const sentAt=performance.now();socket.timeout(5000).emit('time:sync',{},(error,response)=>{if(error){console.warn('Không đồng bộ được đồng hồ máy chủ:',error.message);return;}const receivedAt=performance.now();if(!Number.isFinite(response?.serverTime)){console.warn('Máy chủ trả về thời gian đồng bộ không hợp lệ.');return;}serverClockOffsetMs=response.serverTime-(sentAt+receivedAt)/2;serverClockSynchronized=true;updateTimer();updateIndependentTimer();});}
+function canPlayerBuzz(){if(role!=='player'||!latest||latest.status!=='playing'||latest.buzzerCountdownDeadline||!latest.deadline||Date.now()>=latest.deadline)return false;if(latest.roundMode==='finish'&&latest.finishPlayerId===myId)return false;const me=latest.players.find(player=>player.id===myId);return latest.buzzerAlwaysOpen?!Boolean(me&&me.buzzedAt):!latest.winnerId;}
 function sound(type){ try { audioCtx ||= new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.connect(g);g.connect(audioCtx.destination);o.type='sine';o.frequency.value=type==='buzz'?880:type==='win'?660:440;g.gain.setValueAtTime(.001,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.18,audioCtx.currentTime+.015);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+(type==='win'?.45:.18));o.start();o.stop(audioCtx.currentTime+(type==='win'?.48:.2)); }catch(e){} }
 function setProjectorVolume(volume){if(!Number.isFinite(volume))return;projectorVolume=Math.max(0,Math.min(1,volume));if(projectorMasterGain){projectorMasterGain.gain.setTargetAtTime(projectorVolume,audioCtx.currentTime,.02);}if(role==='host'&&$('projectorVolume')){$('projectorVolume').value=String(Math.round(projectorVolume*100));$('projectorVolumeValue').value=`${Math.round(projectorVolume*100)}%`;}}
 function getProjectorOutput(){if(!projectorMasterGain){projectorMasterGain=audioCtx.createGain();projectorMasterGain.gain.value=projectorVolume;projectorMasterGain.connect(audioCtx.destination);}return projectorMasterGain;}
-async function loadProjectorAudio(type){if(projectorAudioBuffers.has(type))return projectorAudioBuffers.get(type);if(projectorAudioLoading.has(type))return projectorAudioLoading.get(type);const loading=(async()=>{const context=audioCtx||(audioCtx=new (window.AudioContext||window.webkitAudioContext)());const files={buzz:'Buzz.mp3',correct:'Correct.mp3',wrong:'Wrong.mp3',start:'StartKD.mp3',end:'EndKD.mp3',opening:'KD60s.mp3',musicA:'KDmusicA.mp3',musicB:'KDmusicB.mp3',musicC:'KDmusicC.mp3',blank:'Blank.ogg',vcnv15:'VCNV15s.mp3',tt20:'TT20s.mp3',tt30:'TT30s.mp3',tt40:'TT40s.mp3',speedQuestionOpen:'OpenQsTT.mp3',showAnswerVCNV:'ShowAnsVCNV.ogg',showAnswerTT:'ShowAnsTT.ogg'};const file=files[type];if(!file)throw new Error('Không tìm thấy tệp âm thanh.');const response=await fetch(`/Olympia%20Music/${encodeURIComponent(file)}`);if(!response.ok)throw new Error(`Không tải được ${file} (${response.status}).`);const buffer=await context.decodeAudioData(await response.arrayBuffer());projectorAudioBuffers.set(type,buffer);return buffer;})();projectorAudioLoading.set(type,loading);try{return await loading;}finally{projectorAudioLoading.delete(type);}}
+async function loadProjectorAudio(type){if(projectorAudioBuffers.has(type))return projectorAudioBuffers.get(type);if(projectorAudioLoading.has(type))return projectorAudioLoading.get(type);const loading=(async()=>{const context=audioCtx||(audioCtx=new (window.AudioContext||window.webkitAudioContext)());const files={buzz:'Buzz.mp3',correct:'Correct.mp3',wrong:'Wrong.mp3',start:'StartKD.mp3',end:'EndKD.mp3',opening:'KD60s.mp3',musicA:'KDmusicA.mp3',musicB:'KDmusicB.mp3',musicC:'KDmusicC.mp3',blank:'Blank.ogg',vcnv15:'VCNV15s.mp3',tt20:'TT20s.mp3',tt30:'TT30s.mp3',tt40:'TT40s.mp3',speedQuestionOpen:'OpenQsTT.mp3',showAnswerVCNV:'ShowAnsVCNV.ogg',showAnswerTT:'ShowAnsTT.ogg'};const file=files[type]||finishAudioFiles[type];if(!file)throw new Error('Không tìm thấy tệp âm thanh.');const response=await fetch(`/Olympia%20Music/${encodeURIComponent(file)}`);if(!response.ok)throw new Error(`Không tải được ${file} (${response.status}).`);const buffer=await context.decodeAudioData(await response.arrayBuffer());projectorAudioBuffers.set(type,buffer);return buffer;})();projectorAudioLoading.set(type,loading);try{return await loading;}finally{projectorAudioLoading.delete(type);}}
 function playNextProjectorAudio(){if(role!=='projector'||!projectorAudioReady||!projectorAudioQueue.length)return;const type=projectorAudioQueue[0],buffer=projectorAudioBuffers.get(type);if(!buffer)return;const context=audioCtx;if(context.state!=='running'){if(!projectorAudioResumePending){projectorAudioResumePending=true;context.resume().then(()=>{projectorAudioResumePending=false;playNextProjectorAudio();}).catch(error=>{projectorAudioResumePending=false;toast(`Không thể tiếp tục phát âm thanh: ${error.message}`);});}return;}projectorAudioQueue.shift();const source=context.createBufferSource();source.buffer=buffer;source.connect(getProjectorOutput());source.onended=playNextProjectorAudio;source.start();}
-async function queueProjectorAudio(type){if(!['buzz','correct','wrong','start','end','opening','blank','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT'].includes(type))return;projectorAudioQueue.push(type);if(!projectorAudioBuffers.has(type)){try{await loadProjectorAudio(type);}catch(error){projectorAudioQueue=projectorAudioQueue.filter(item=>item!==type);toast(`Không thể tải âm thanh máy chiếu: ${error.message}`);return;}}playNextProjectorAudio();}
+async function queueProjectorAudio(type){if(!['buzz','correct','wrong','start','end','opening','blank','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT',...Object.keys(finishAudioFiles)].includes(type))return;projectorAudioQueue.push(type);if(!projectorAudioBuffers.has(type)){try{await loadProjectorAudio(type);}catch(error){projectorAudioQueue=projectorAudioQueue.filter(item=>item!==type);toast(`Không thể tải âm thanh máy chiếu: ${error.message}`);return;}}playNextProjectorAudio();}
 function queueProjectorBuzz(){queueProjectorAudio('buzz');}
 function syncProjectorOpeningMusic(state,force=false){
  if(role!=='projector')return;
@@ -48,7 +52,7 @@ function startProjectorOpeningMusic(type,buffer){
  projectorOpeningMusicSource=source;
  source.start();
 }
-async function unlockProjectorAudio(){if(role!=='projector')return;try{const context=audioCtx||(audioCtx=new (window.AudioContext||window.webkitAudioContext)());await context.resume();await Promise.all(['buzz','correct','wrong','start','end','opening','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT'].map(loadProjectorAudio));projectorAudioReady=true;playNextProjectorAudio();syncProjectorOpeningMusic(latest,true);toast('Âm thanh máy chiếu đã bật.');}catch(error){projectorAudioReady=false;toast(`Không thể bật âm thanh máy chiếu: ${error.message}`);}}
+async function unlockProjectorAudio(){if(role!=='projector')return;try{const context=audioCtx||(audioCtx=new (window.AudioContext||window.webkitAudioContext)());await context.resume();await Promise.all(['buzz','correct','wrong','start','end','opening','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT',...Object.keys(finishAudioFiles)].map(loadProjectorAudio));projectorAudioReady=true;playNextProjectorAudio();syncProjectorOpeningMusic(latest,true);toast('Âm thanh máy chiếu đã bật.');}catch(error){projectorAudioReady=false;toast(`Không thể bật âm thanh máy chiếu: ${error.message}`);}}
 function emitAck(event,data={}){return new Promise(resolve=>socket.emit(event,data,r=>resolve(r||{ok:false,error:'Không nhận được phản hồi từ máy chủ.'})));}
 function reportPlayerFocus(){if(role==='player'&&socket.connected)socket.emit('player:focus',{focused:document.visibilityState==='visible'&&document.hasFocus()});}
 window.addEventListener('focus',reportPlayerFocus);
@@ -56,10 +60,10 @@ window.addEventListener('blur',reportPlayerFocus);
 document.addEventListener('visibilitychange',reportPlayerFocus);
 document.addEventListener('keydown',event=>{
  if(role!=='host'||$('hostView').classList.contains('hidden')||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
- if(latest?.roundMode!=='opening')return;
+ if(event.repeat)return;
  if(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
- const buttons={ArrowUp:$('openingAnswerCorrect'),ArrowDown:$('openingAnswerIncorrect'),ArrowRight:$('nextOpeningQuestion'),ArrowLeft:$('previousOpeningQuestion'),z:$('startFiveSecondTimer'),Z:$('startFiveSecondTimer'),b:$('playBlankSound'),B:$('playBlankSound')};
- const button=buttons[event.key];
+ const buttons=latest?.roundMode==='finish'?{c:$('finishCorrect'),x:$('finishWrong'),b:$('finishBlank'),ArrowRight:$('nextFinishQuestion'),ArrowLeft:$('previousFinishQuestion')}:latest?.roundMode==='opening'?{ArrowUp:$('openingAnswerCorrect'),ArrowDown:$('openingAnswerIncorrect'),ArrowRight:$('nextOpeningQuestion'),ArrowLeft:$('previousOpeningQuestion'),z:$('startFiveSecondTimer'),b:$('playBlankSound')}:{};
+ const button=buttons[event.key.length===1?event.key.toLowerCase():event.key];
  if(!button)return;
  event.preventDefault();
  if(!button.disabled)button.click();
@@ -73,8 +77,16 @@ $('hostView').querySelectorAll('[data-host-round]').forEach(button=>button.addEv
  if(!result.ok)toast(result.error);
  else updateHostRoundButtons(data.round);
 }));
-$('finishPlayerSelect').addEventListener('change',()=>{$('startFinishRound').disabled=!$('finishPlayerSelect').value;});
+$('finishPlayerSelect').addEventListener('change',()=>{$('startFinishRound').disabled=!$('finishPlayerSelect').value;refreshFinishCommitButton();});
+$('startFinishRound').onclick=async()=>{const result=await emitAck('host:finish:start',{playerId:$('finishPlayerSelect').value});if(!result.ok)return toast(result.error);toast('Đã chọn thí sinh Về đích; chuông của thí sinh này bị khóa.');};
+$('finishNshv').onclick=async()=>{const result=await emitAck('host:finish:nshv');if(!result.ok)toast(result.error);};
+$('finishBlank').onclick=async()=>{const result=await emitAck('host:opening:audio',{type:'blank'});if(!result.ok)toast(result.error);};
+$('finishCorrect').onclick=async()=>{const result=await emitAck('host:finish:judge',{correct:true});if(!result.ok)toast(result.error);};
+$('finishWrong').onclick=async()=>{const result=await emitAck('host:finish:judge',{correct:false});if(!result.ok)toast(result.error);};
+for(const seconds of [15,20,30])$(`finishTimer${seconds}`).onclick=async()=>{const result=await emitAck('host:finish:timer',{seconds});if(!result.ok)toast(result.error);};
+$('finishRoundSelect').addEventListener('change',refreshFinishCommitButton);
 $('finishAllowFortyQuestionFour').addEventListener('change',updateFinishQuestionChoices);
+document.querySelectorAll('.finish-question-choice-grid input[type="radio"]').forEach(input=>input.addEventListener('change',refreshFinishCommitButton));
 updateFinishQuestionChoices();
 function updateHostRoundButtons(round){
  $('hostView').querySelectorAll('[data-host-round]').forEach(button=>{
@@ -94,6 +106,7 @@ function refreshFinishControls(state){
  }
  select.value=options.some(([value])=>value===selected)?selected:'';
  $('startFinishRound').disabled=!select.value;
+ refreshFinishCommitButton();
 }
 function updateFinishQuestionChoices(){
  const allowFortyQuestionFour=$('finishAllowFortyQuestionFour').checked;
@@ -101,6 +114,32 @@ function updateFinishQuestionChoices(){
   input.disabled=!allowFortyQuestionFour&&(input.value==='40'||input.name==='finish-question-4');
   if(input.disabled)input.checked=false;
  });
+ refreshFinishCommitButton();
+}
+function getFinishQuestionPoints(){
+ return [1,2,3].map(number=>{
+  const selected=$('hostView').querySelector(`input[name="finish-question-${number}"]:checked`);
+  return selected?Number(selected.value):null;
+ });
+}
+function refreshFinishCommitButton(){
+ const points=getFinishQuestionPoints();
+ $('waitFinishRound').disabled=$('finishAllowFortyQuestionFour').checked||
+  !$('finishRoundSelect').value||!$('finishPlayerSelect').value||
+  points.length!==3||points.some(value=>value!==20&&value!==30);
+}
+function resetFinishQuestionSelection(){
+ document.querySelectorAll('.finish-question-choice-grid input[type="radio"]').forEach(input=>{input.checked=false;});
+ $('finishRoundSelect').value='';
+ $('finishPlayerSelect').value='';
+ $('startFinishRound').disabled=true;
+ updateFinishQuestionChoices();
+ refreshFinishCommitButton();
+}
+function updateFinishQuestionNavigation(state){
+ const count=state?.finishQuestionCount||0,index=state?.finishQuestionIndex;
+ $('nextFinishQuestion').disabled=!count||(Number.isInteger(index)&&index>=count-1);
+ $('previousFinishQuestion').disabled=!count||!Number.isInteger(index)||index<=0;
 }
 function renderSpeedQuestionSelect(){
  const select=$('speedQuestionSelect');
@@ -328,6 +367,31 @@ $('startFiveSecondTimer').onclick=async()=>{const result=await emitAck('host:ope
 $('playBlankSound').onclick=async()=>{const result=await emitAck('host:opening:audio',{type:'blank'});if(!result.ok)toast(result.error);};
 $('nextOpeningQuestion').onclick=()=>navigateOpeningQuestion('next');
 $('previousOpeningQuestion').onclick=()=>navigateOpeningQuestion('previous');
+$('waitFinishRound').onclick=async()=>{
+ const result=await emitAck('host:finish:commit',{
+  round:$('finishRoundSelect').value===''?null:Number($('finishRoundSelect').value),
+  playerId:$('finishPlayerSelect').value,
+  points:getFinishQuestionPoints(),
+  allowFortyQuestionFour:$('finishAllowFortyQuestionFour').checked
+ });
+ if(!result.ok)return toast(result.error);
+ $('hostAnswerNote').value='';
+ toast('Đã chốt 3 câu. Nhấn NextQs để hiển thị câu đầu tiên.');
+};
+$('nextFinishQuestion').onclick=()=>navigateFinishQuestion('next');
+$('previousFinishQuestion').onclick=()=>navigateFinishQuestion('previous');
+async function navigateFinishQuestion(direction){
+ const result=await emitAck('host:finish:navigate',{direction});
+ if(!result.ok)return toast(result.error);
+ $('hostAnswerNote').value=result.answer||'';
+}
+$('endFinishRound').onclick=async()=>{
+ const result=await emitAck('host:finish:end');
+ if(!result.ok)return toast(result.error);
+ resetFinishQuestionSelection();
+ $('hostQuestionInput').value='';
+ $('hostAnswerNote').value='';
+};
 async function navigateOpeningQuestion(direction){
  const result=await emitAck('host:opening:navigate',{round:$('spotlightRound').value,direction,duration:$('duration').value});
  if(!result.ok)return toast(result.error);
@@ -427,21 +491,22 @@ socket.on('projector:volume',({volume}={})=>{setProjectorVolume(volume);if(lates
 function renderAnswers(answers=[]){const latestByPlayer=new Map();for(const a of answers){const old=latestByPlayer.get(a.playerId);if(!old||a.submittedAt>=old.submittedAt)latestByPlayer.set(a.playerId,a);}const latestAnswers=[...latestByPlayer.values()].sort((a,b)=>a.elapsedMs-b.elapsedMs);$('answerCount').textContent=`${latestAnswers.length} thí sinh đã trả lời`;$('hostAnswers').innerHTML='';if(!latestAnswers.length){$('hostAnswers').innerHTML='<p class="muted">Chưa có câu trả lời.</p>';return;}latestAnswers.forEach(a=>{const card=document.createElement('article');card.className='answercard';const top=document.createElement('div');top.className='answercardtop';const who=document.createElement('strong');who.textContent=`${a.name} · ${a.team}`;const time=document.createElement('time');time.textContent=formatElapsed(a.elapsedMs);top.append(who,time);const body=document.createElement('p');body.textContent=a.answer;card.append(top,body);$('hostAnswers').append(card);});}
 function renderBuzzes(buzzes=[]){if(!$('hostBuzzes'))return;$('buzzCount').textContent=`${buzzes.length} lượt`;$('hostBuzzes').innerHTML='';if(!buzzes.length){$('hostBuzzes').innerHTML='<p class="muted">Chưa có thí sinh bấm chuông.</p>';return;}[...buzzes].sort((a,b)=>a.elapsedMs-b.elapsedMs).forEach((b,i)=>{const card=document.createElement('article');card.className='answercard';const top=document.createElement('div');top.className='answercardtop';const who=document.createElement('strong');who.textContent=`${i+1}. ${b.name} · ${b.team}`;const time=document.createElement('time');time.textContent=formatElapsed(b.elapsedMs);top.append(who,time);card.append(top);$('hostBuzzes').append(card);});}
 function queueNewProjectorBuzzes(state,previous){if(role!=='projector'||!previous)return;if(state.buzzerAlwaysOpen&&!(previous.buzzes||[]).length&&(state.buzzes||[]).length)queueProjectorBuzz();else if(!state.buzzerAlwaysOpen&&!previous.buzzerAlwaysOpen&&state.winnerId&&state.winnerId!==previous.winnerId)queueProjectorBuzz();}
-socket.on('projector:audio',({type}={})=>{if(role==='projector'&&['correct','wrong','start','end','opening','blank','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT'].includes(type))queueProjectorAudio(type);});
-function renderBase(state){const previous=latest;if(!state)return;queueNewProjectorBuzzes(state,previous);latest=state;if(Number.isFinite(state.projectorVolume))setProjectorVolume(state.projectorVolume);if(role==='projector')syncProjectorOpeningMusic(state);if(role==='host'&&!$('hostQuestionInput').matches(':focus'))$('hostQuestionInput').value=state.question||'';if(role==='projector'){renderProjector(state);updateTimer();return;}const names={waiting:'ĐANG CHỜ',playing:'CHUÔNG ĐANG MỞ',won:'ĐÃ CÓ NGƯỜI BẤM',locked:'ĐÃ KHÓA',timeout:'HẾT THỜI GIAN'};const winner=state.players.find(p=>p.id===state.winnerId);
+socket.on('projector:audio',({type}={})=>{if(role==='projector'&&['correct','wrong','start','end','opening','blank','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT',...Object.keys(finishAudioFiles)].includes(type))queueProjectorAudio(type);});
+function renderBase(state){const previous=latest;if(!state)return;queueNewProjectorBuzzes(state,previous);latest=state;if(role==='host'&&$('finishNshv')){$('finishNshv').classList.toggle('finish-nshv-active',Boolean(state.finishNshv));$('finishNshv').setAttribute('aria-pressed',String(Boolean(state.finishNshv)));}if(Number.isFinite(state.projectorVolume))setProjectorVolume(state.projectorVolume);if(role==='projector')syncProjectorOpeningMusic(state);if(role==='host'&&!$('hostQuestionInput').matches(':focus'))$('hostQuestionInput').value=state.question||'';if(role==='projector'){renderProjector(state);updateTimer();return;}const names={waiting:'ĐANG CHỜ',playing:'CHUÔNG ĐANG MỞ',won:'ĐÃ CÓ NGƯỜI BẤM',locked:'ĐÃ KHÓA',timeout:'HẾT THỜI GIAN'};const winner=state.players.find(p=>p.id===state.winnerId);
 if(role==='host'){$('hostStatus').textContent=names[state.status]||state.status;$('hostStatus').className='status '+(state.status==='playing'?'live':state.status==='won'?'won':'');$('hostWinner').classList.add('hidden');$('hostWinner').textContent='';$('alwaysOpen').checked=Boolean(state.buzzerAlwaysOpen);$('playerCount').textContent=`${state.players.length} người`;renderHostPlayers(state.players,state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId);renderBuzzes(state.buzzes||[]);$('startRoundDelayed').disabled=Boolean(state.buzzerCountdownDeadline);}
-if(role==='player'){const wasAnswering=Boolean(previous&&previous.independentTimer&&previous.independentTimer.running&&previous.independentTimer.remainingMs>0);const isAnswering=Boolean(state.independentTimer&&state.independentTimer.running&&state.independentTimer.remainingMs>0);if(isAnswering&&!wasAnswering){$('answerInput').value='';$('answerInput').disabled=false;setTimeout(()=>$('answerInput').focus(),0);} $('playerStatus').textContent=names[state.status]||state.status;$('playerStatus').className='status '+(state.status==='playing'?'live':state.status==='won'?'won':'');const me=state.players.find(p=>p.id===myId);$('myScore').textContent=me?me.score:0;if(me&&me.latestAnswer){$('lastAnswerText').textContent=me.latestAnswer.answer;$('lastAnswerTime').textContent=`Đã gửi lúc ${formatElapsed(me.latestAnswer.elapsedMs)}`;}const canBuzz=state.status==='playing'&&!state.buzzerCountdownDeadline&&(state.buzzerAlwaysOpen?!Boolean(me&&me.buzzedAt):!state.winnerId);$('buzzButton').disabled=!canBuzz;$('buzzButton').classList.toggle('ready',canBuzz);$('buzzButton').classList.toggle('pressed',state.buzzerAlwaysOpen?Boolean(me&&me.buzzedAt):state.winnerId===myId);const canSubmitAnswer=isAnswering;$('answerInput').disabled=!canSubmitAnswer;$('submitAnswer').disabled=!canSubmitAnswer;$('answerMessage').textContent=canSubmitAnswer?'Bạn có thể gửi nhiều câu trả lời cho đến khi hết giờ. Nhấn Enter để gửi nhanh (Shift + Enter để xuống dòng).':'Chờ Host bắt đầu hoặc tiếp tục thời gian trả lời...';$('answerMessage').className='muted';$('playerMessage').textContent=state.buzzerCountdownDeadline?'Chuông sẽ mở sau khi đếm ngược kết thúc.':state.buzzerAlwaysOpen&&state.status==='playing'?(me&&me.buzzedAt?'Bạn đã bấm chuông. Hãy chờ Host!':'Chuông luôn mở – mỗi thí sinh được bấm một lần!'):winner?(winner.id===myId?'Bạn đã bấm chuông đầu tiên!':`${winner.name} đã bấm chuông trước.`):state.status==='playing'?'Chuông đã mở – hãy bấm thật nhanh!':state.status==='timeout'?'Đã hết thời gian.':state.status==='locked'?'Chuông đã khóa. Ô trả lời hoạt động theo đồng hồ riêng.':'Chờ Host mở chuông…';$('playerScoreboard').innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;[...state.players].sort((a,b)=>b.score-a.score).forEach(p=>$('playerScoreboard').append(scoreRow(p,false,p.id===fastestId)));}
+if(role==='player'){const wasAnswering=Boolean(previous&&previous.independentTimer&&previous.independentTimer.running&&previous.independentTimer.remainingMs>0);const isAnswering=Boolean(state.independentTimer&&state.independentTimer.running&&state.independentTimer.remainingMs>0);if(isAnswering&&!wasAnswering){$('answerInput').value='';$('answerInput').disabled=false;setTimeout(()=>$('answerInput').focus(),0);} $('playerStatus').textContent=names[state.status]||state.status;$('playerStatus').className='status '+(state.status==='playing'?'live':state.status==='won'?'won':'');const me=state.players.find(p=>p.id===myId);$('myScore').textContent=me?me.score:0;if(me&&me.latestAnswer){$('lastAnswerText').textContent=me.latestAnswer.answer;$('lastAnswerTime').textContent=`Đã gửi lúc ${formatElapsed(me.latestAnswer.elapsedMs)}`;}const canBuzz=state.status==='playing'&&!state.buzzerCountdownDeadline&&!(state.roundMode==='finish'&&state.finishPlayerId===myId)&&(state.buzzerAlwaysOpen?!Boolean(me&&me.buzzedAt):!state.winnerId);$('buzzButton').disabled=!canBuzz;$('buzzButton').classList.toggle('ready',canBuzz);$('buzzButton').classList.toggle('pressed',state.buzzerAlwaysOpen?Boolean(me&&me.buzzedAt):state.winnerId===myId);const canSubmitAnswer=isAnswering;$('answerInput').disabled=!canSubmitAnswer;$('submitAnswer').disabled=!canSubmitAnswer;$('answerMessage').textContent=canSubmitAnswer?'Bạn có thể gửi nhiều câu trả lời cho đến khi hết giờ. Nhấn Enter để gửi nhanh (Shift + Enter để xuống dòng).':'Chờ Host bắt đầu hoặc tiếp tục thời gian trả lời...';$('answerMessage').className='muted';$('playerMessage').textContent=state.buzzerCountdownDeadline?'Chuông sẽ mở sau khi đếm ngược kết thúc.':state.buzzerAlwaysOpen&&state.status==='playing'?(me&&me.buzzedAt?'Bạn đã bấm chuông. Hãy chờ Host!':'Chuông luôn mở – mỗi thí sinh được bấm một lần!'):winner?(winner.id===myId?'Bạn đã bấm chuông đầu tiên!':`${winner.name} đã bấm chuông trước.`):state.status==='playing'?'Chuông đã mở – hãy bấm thật nhanh!':state.status==='timeout'?'Đã hết thời gian.':state.status==='locked'?'Chuông đã khóa. Ô trả lời hoạt động theo đồng hồ riêng.':'Chờ Host mở chuông…';$('playerScoreboard').innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;[...state.players].sort((a,b)=>b.score-a.score).forEach(p=>$('playerScoreboard').append(scoreRow(p,false,p.id===fastestId)));}
 if((lastStatus==='playing'||lastStatus==='locked')&&state.status==='won')sound('win');if(state.status==='playing'&&lastStatus!=='playing')sound('open');lastStatus=state.status;updateTimer();updateIndependentTimer();}
 function render(state){
  renderBase(state);
  if(!state)return;
  if(role==='player')renderPlayerQuestion(state);
- if(role==='host'){updateHostRoundButtons(state.roundMode||'opening');refreshFinishControls(state);}
+ if(role==='host'){updateHostRoundButtons(state.roundMode||'opening');refreshFinishControls(state);updateFinishQuestionNavigation(state);$('finishQuestionPointsDisplay').textContent=Number.isInteger(state.finishQuestionPoints)?`Câu ${state.finishQuestionPoints} điểm`:'Câu ... điểm';}
  if(role==='host')setOpeningNavigationEnabled(Boolean(state.openingQuestionRound&&Number.isInteger(state.openingQuestionIndex)));
- if(role==='host'){refreshSpotlightControls(state);syncHostOpeningAnswer(state);applySpotlightClass($('hostPlayers'),state.players);}
- else if(role==='player')applySpotlightClass($('playerScoreboard'),[...state.players].sort((a,b)=>b.score-a.score));
- else if(role==='projector')applySpotlightClass($('projectorScoreboard'),[...state.players].sort((a,b)=>b.score-a.score));
+ if(role==='host'){refreshSpotlightControls(state);syncHostOpeningAnswer(state);applySpotlightClass($('hostPlayers'),state.players);applyFinishSelectedClass($('hostPlayers'),state.players);}
+ else if(role==='player'){const players=[...state.players].sort((a,b)=>b.score-a.score);applySpotlightClass($('playerScoreboard'),players);applyFinishSelectedClass($('playerScoreboard'),players);}
+ else if(role==='projector'){const players=[...state.players].sort((a,b)=>b.score-a.score);applySpotlightClass($('projectorScoreboard'),players);applyFinishSelectedClass($('projectorScoreboard'),players);applyFinishSelectedClass($('projectorPlayerScoreboard'),players);}
 }
+function applyFinishSelectedClass(container,players){container.querySelectorAll('.playerrow,.projector-player').forEach((row,index)=>row.classList.toggle('finish-selected-player',players[index]?.id===latest?.finishPlayerId));}
 function renderPlayerQuestion(state){
  const projector=role==='projector';
  const display=$(projector?'projectorPlayerQuestion':'questionDisplay'),text=$(projector?'projectorPlayerQuestionText':'questionDisplayText'),media=$(projector?'projectorPlayerQuestionMedia':'questionDisplayMedia');
@@ -526,6 +591,9 @@ socket.on('host:database:questions:update',questions=>{
  refreshSpotlightControls(latest);
  syncHostOpeningAnswer(latest);
 });
+socket.on('host:finish:answer',({answer}={})=>{
+ if(role==='host'&&typeof answer==='string')$('hostAnswerNote').value=answer;
+});
 socket.on('host:database:speed-questions:update',questions=>{
  if(role!=='host'||!Array.isArray(questions))return;
  speedQuestionSlots=questions;
@@ -536,6 +604,10 @@ function setOpeningNavigationEnabled(enabled){$('nextOpeningQuestion').disabled=
 function applySpotlightClass(container,players){const highlightedId=latest?.buzzerAlwaysOpen?fastestBuzzerId(latest.buzzes):latest?.spotlightPlayerId;[...container.querySelectorAll('.playerrow,.projector-player')].forEach((row,index)=>row.classList.toggle('spotlight-player',players[index]?.id===highlightedId));}
 function syncHostOpeningAnswer(state){
  if(role!=='host')return;
+ if(state?.roundMode==='finish'){
+  if(!Number.isInteger(state.finishQuestionIndex))$('hostAnswerNote').value='';
+  return;
+ }
  if(activeSpeedQuestionSlot!==null&&!state?.openingQuestionRound){
   $('hostAnswerNote').value=speedQuestionSlots[activeSpeedQuestionSlot]?.answer||'';
   return;
@@ -784,12 +856,12 @@ async function saveRoundQuestion(round,index,existing,prompt,answer){
  refreshSpotlightControls(latest);syncHostOpeningAnswer(latest);
 }
 function formatClock(ms){const total=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;}
-function updateIndependentTimer(){const t=latest&&latest.independentTimer;if(!t)return;const remaining=t.running&&t.deadline?Math.max(0,t.deadline-Date.now()):t.remainingMs;if($('hostIndependentDisplay'))$('hostIndependentDisplay').textContent=formatClock(remaining);if($('playerIndependentDisplay'))$('playerIndependentDisplay').textContent=formatClock(remaining);if($('projectorIndependentDisplay'))$('projectorIndependentDisplay').textContent=formatClock(remaining);if($('independentReset'))$('independentReset').disabled=Boolean(t.running&&remaining>0);if(role==='player'&&remaining<=0){$('answerInput').disabled=true;$('submitAnswer').disabled=true;}}
+function updateIndependentTimer(){const t=latest&&latest.independentTimer;if(!t)return;const remaining=t.running&&t.deadline?Math.max(0,t.deadline-displayNow()):t.remainingMs;if($('hostIndependentDisplay'))$('hostIndependentDisplay').textContent=formatClock(remaining);if($('playerIndependentDisplay'))$('playerIndependentDisplay').textContent=formatClock(remaining);if($('projectorIndependentDisplay'))$('projectorIndependentDisplay').textContent=formatClock(remaining);if($('independentReset'))$('independentReset').disabled=Boolean(t.running&&remaining>0);if(role==='player'&&remaining<=0){$('answerInput').disabled=true;$('submitAnswer').disabled=true;}}
 function updateTimer(){
  clearInterval(tickHandle);
  const paint=()=>{
   if(!latest){$('hostTimer').textContent='--';$('playerTimer').textContent='--';$('projectorQuestionTimerBox').classList.add('hidden');$('projectorQuestionTimer').textContent='';return;}
-  const now=Date.now();
+  const now=displayNow();
   const countdownDeadline=latest.buzzerCountdownDeadline;
   const countdownActive=Boolean(countdownDeadline&&countdownDeadline>now);
   const buzzerActive=Boolean(latest.deadline&&['playing','won','locked'].includes(latest.status));
@@ -827,4 +899,4 @@ function updateTimer(){
  paint();
  if(latest&&(latest.buzzerCountdownDeadline||latest.winnerCountdownDeadline||latest.openingDeadline||(latest.deadline&&['playing','won','locked'].includes(latest.status))))tickHandle=setInterval(paint,100);
 }
-socket.on('room:update',render);socket.on('connect',async()=>{const params=new URLSearchParams(location.search),projectorCode=params.get('projector'),playerCode=params.get('room'),databaseCode=params.get('database');if(projectorCode){role='projector';show('projectorView');const r=await emitAck('projector:join',{code:projectorCode});if(!r.ok){$('projectorQuestion').textContent=r.error;return;}roomCode=r.state.code;render(r.state);return;}if(databaseCode){role='database';show('hostDatabase');$('closeDatabase').textContent='ĐÓNG TRANG';const storageKey=`olympia-database-token:${databaseCode}`;let token=location.hash.slice(1)||sessionStorage.getItem(storageKey)||'';if(!token){toast('Thiếu quyền truy cập Database. Hãy mở Database từ màn hình Host.');show('home');return;}const r=await emitAck('host:database:join',{code:databaseCode,token});if(!r.ok){sessionStorage.removeItem(storageKey);toast(r.error);show('home');return;}roomCode=r.code;sessionStorage.setItem(storageKey,token);if(location.hash)history.replaceState(null,'',`${location.pathname}${location.search}`);await loadDatabase();return;}if(playerCode){$('joinCode').value=playerCode.toUpperCase();show('playerSetup');}});socket.on('disconnect',()=>toast('Mất kết nối máy chủ. Đang thử kết nối lại…'));
+socket.on('room:update',render);socket.on('connect',async()=>{syncServerClock();const params=new URLSearchParams(location.search),projectorCode=params.get('projector'),playerCode=params.get('room'),databaseCode=params.get('database');if(projectorCode){role='projector';show('projectorView');const r=await emitAck('projector:join',{code:projectorCode});if(!r.ok){$('projectorQuestion').textContent=r.error;return;}roomCode=r.state.code;render(r.state);return;}if(databaseCode){role='database';show('hostDatabase');$('closeDatabase').textContent='ĐÓNG TRANG';const storageKey=`olympia-database-token:${databaseCode}`;let token=location.hash.slice(1)||sessionStorage.getItem(storageKey)||'';if(!token){toast('Thiếu quyền truy cập Database. Hãy mở Database từ màn hình Host.');show('home');return;}const r=await emitAck('host:database:join',{code:databaseCode,token});if(!r.ok){sessionStorage.removeItem(storageKey);toast(r.error);show('home');return;}roomCode=r.code;sessionStorage.setItem(storageKey,token);if(location.hash)history.replaceState(null,'',`${location.pathname}${location.search}`);await loadDatabase();return;}if(playerCode){$('joinCode').value=playerCode.toUpperCase();show('playerSetup');}});setInterval(syncServerClock,30000);socket.on('disconnect',()=>toast('Mất kết nối máy chủ. Đang thử kết nối lại…'));

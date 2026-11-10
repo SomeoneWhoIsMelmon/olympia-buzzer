@@ -442,7 +442,7 @@ body,body.player-active{background:#000040;}
 .host-active .host-future-panel .finish-round-layout label{font-size:clamp(8px,.78vw,11px);}
 .host-active .host-future-panel .finish-round-layout select{height:clamp(22px,3vh,30px);font-size:clamp(9px,.8vw,12px);}
 .finish-round-start-actions{display:grid;grid-template-rows:repeat(2,minmax(0,1fr));gap:4px;min-width:0;}
-.finish-round-action-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:4px;min-width:0;min-height:0;}
+.finish-round-action-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:4px;min-width:0;min-height:0;}
 .finish-round-layout button{min-width:0;min-height:0;padding:3px 2px;border:1px solid #fff;border-radius:0;background:#000040;color:#fff;font-size:clamp(8px,.85vw,13px);letter-spacing:0;line-height:1.05;white-space:normal;overflow-wrap:anywhere;}
 .finish-round-layout button:disabled{opacity:.35;filter:grayscale(1);}
 .finish-round-action-grid>button:nth-child(1){grid-area:1/1;}
@@ -455,7 +455,8 @@ body,body.player-active{background:#000040;}
 .finish-round-action-grid>button:nth-child(8){grid-area:2/4;}
 .finish-round-action-grid>button:nth-child(9){grid-area:3/1/4/3;}
 .finish-round-action-grid>button:nth-child(10){grid-area:4/1/5/3;}
-.finish-round-action-grid .finish-allow-option{grid-column:3/5;grid-row:3/5;display:flex;align-items:center;gap:5px;font-size:clamp(8px,.72vw,11px);line-height:1.1;}
+.finish-round-action-grid #finishQuestionPointsDisplay{grid-area:3/3/4/5;}
+.finish-round-action-grid .finish-allow-option{grid-column:3/5;grid-row:4/6;display:flex;align-items:center;gap:5px;font-size:clamp(8px,.72vw,11px);line-height:1.1;}
 .host-active .host-future-panel .finish-allow-option input{display:block;flex:none;width:clamp(14px,1.8vw,22px);height:clamp(14px,1.8vw,22px);margin:0;padding:0;accent-color:#00ff00;}
 @media(max-width:650px){
  .host-active .host-future-panel.finish-round-active{height:auto;min-height:320px;}
@@ -468,3 +469,10 @@ body,body.player-active{background:#000040;}
 }
 .host-active .host-score-panel .playerrow.spotlight-player,.player-active .player-score-panel .playerrow.spotlight-player,.projector-player.spotlight-player{background:#e00000!important;border-color:#ff4d4d!important;color:#fff!important;}
 .host-active .host-score-panel .playerrow.spotlight-player .playername,.host-active .host-score-panel .playerrow.spotlight-player .playerteam,.host-active .host-score-panel .playerrow.spotlight-player .points{color:#fff!important;}
+.host-active .host-score-panel .playerrow.finish-selected-player{background:#738CFF!important;border-color:#aebcff!important;color:#fff!important;}
+.host-active .host-score-panel .playerrow.finish-selected-player .playername,.host-active .host-score-panel .playerrow.finish-selected-player .playerteam,.host-active .host-score-panel .playerrow.finish-selected-player .points{color:#fff!important;}
+.player-active .player-score-panel .playerrow.finish-selected-player,.projector-player-layout .player-score-panel .playerrow.finish-selected-player,.projector-score-panel .projector-player.finish-selected-player{background:#738CFF!important;border-color:#aebcff!important;color:#fff!important;}
+.player-active .player-score-panel .playerrow.finish-selected-player .playername,.player-active .player-score-panel .playerrow.finish-selected-player .playerteam,.player-active .player-score-panel .playerrow.finish-selected-player .points,.projector-player-layout .player-score-panel .playerrow.finish-selected-player .playername,.projector-player-layout .player-score-panel .playerrow.finish-selected-player .playerteam,.projector-player-layout .player-score-panel .playerrow.finish-selected-player .points{color:#fff!important;}
+
+.finish-round-layout button.finish-nshv-active{background:#ffd700;color:#000;border-color:#fff;}
+.finish-round-action-grid #finishQuestionPointsDisplay{background:#738CFF;color:#fff;}
