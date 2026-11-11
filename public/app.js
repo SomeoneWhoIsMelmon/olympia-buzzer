@@ -161,15 +161,8 @@ $('speedQuestionSelect').addEventListener('change',async()=>{
  if(!result.ok)toast(result.error);
 });
 $('openProjector').onclick=()=>{const projector=window.open(`${location.origin}/?projector=${encodeURIComponent(roomCode)}`,'_blank');if(!projector)toast('Trình duyệt đã chặn cửa sổ máy chiếu. Hãy cho phép cửa sổ bật lên rồi thử lại.');};
-$('openDatabase').onclick=()=>{
- const databasePage=window.open('about:blank','_blank');
- if(!databasePage)return toast('Trình duyệt đã chặn cửa sổ Database. Hãy cho phép cửa sổ bật lên rồi thử lại.');
- emitAck('host:database:token').then(result=>{
-  if(!result.ok){databasePage.close();return toast(result.error);}
-  databasePage.location.href=`${location.origin}/?database=${encodeURIComponent(roomCode)}#${result.token}`;
- }).catch(error=>{databasePage.close();toast(`Không thể mở Database: ${error.message}`);});
-};
-$('closeDatabase').onclick=()=>{if(role==='database')window.close();else show('hostView');};
+openDatabase.onclick=()=>{show('hostDatabase');loadDatabase();};
+closeDatabase.onclick=()=>show('hostView');
 $('clearDatabase').onclick=async()=>{
  if(!databaseQuestions.length)return;
  if(!confirm(`Xóa toàn bộ ${databaseQuestions.length} câu hỏi khỏi Database của phòng này?`))return;
@@ -899,4 +892,4 @@ function updateTimer(){
  paint();
  if(latest&&(latest.buzzerCountdownDeadline||latest.winnerCountdownDeadline||latest.openingDeadline||(latest.deadline&&['playing','won','locked'].includes(latest.status))))tickHandle=setInterval(paint,100);
 }
-socket.on('room:update',render);socket.on('connect',async()=>{syncServerClock();const params=new URLSearchParams(location.search),projectorCode=params.get('projector'),playerCode=params.get('room'),databaseCode=params.get('database');if(projectorCode){role='projector';show('projectorView');const r=await emitAck('projector:join',{code:projectorCode});if(!r.ok){$('projectorQuestion').textContent=r.error;return;}roomCode=r.state.code;render(r.state);return;}if(databaseCode){role='database';show('hostDatabase');$('closeDatabase').textContent='ĐÓNG TRANG';const storageKey=`olympia-database-token:${databaseCode}`;let token=location.hash.slice(1)||sessionStorage.getItem(storageKey)||'';if(!token){toast('Thiếu quyền truy cập Database. Hãy mở Database từ màn hình Host.');show('home');return;}const r=await emitAck('host:database:join',{code:databaseCode,token});if(!r.ok){sessionStorage.removeItem(storageKey);toast(r.error);show('home');return;}roomCode=r.code;sessionStorage.setItem(storageKey,token);if(location.hash)history.replaceState(null,'',`${location.pathname}${location.search}`);await loadDatabase();return;}if(playerCode){$('joinCode').value=playerCode.toUpperCase();show('playerSetup');}});setInterval(syncServerClock,30000);socket.on('disconnect',()=>toast('Mất kết nối máy chủ. Đang thử kết nối lại…'));
+socket.on('room:update',render);socket.on('connect',async()=>{syncServerClock();const params=new URLSearchParams(location.search),projectorCode=params.get('projector'),playerCode=params.get('room');if(projectorCode){role='projector';show('projectorView');const r=await emitAck('projector:join',{code:projectorCode});if(!r.ok){$('projectorQuestion').textContent=r.error;return;}roomCode=r.state.code;render(r.state);return;}if(playerCode){$('joinCode').value=playerCode.toUpperCase();show('playerSetup');}});setInterval(syncServerClock,30000);socket.on('disconnect',()=>toast('Mất kết nối máy chủ. Đang thử kết nối lại…'));
