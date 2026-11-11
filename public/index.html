@@ -66,6 +66,48 @@
           <label class="finish-allow-option"><input id="finishAllowFortyQuestionFour" type="checkbox">Cho phép chọn câu 40 điểm và câu số 4</label>
         </div>
       </div>
+      <div id="hostObstacleReveal" class="host-obstacle-reveal hidden" aria-label="Bảng mở ảnh Vượt chướng ngại vật">
+        <div class="host-obstacle-image-column">
+          <div id="hostObstaclePicture" class="host-obstacle-picture" aria-label="Ảnh Vượt chướng ngại vật"></div>
+          <div class="host-obstacle-bottom-controls">
+            <button id="hostObstacleRevealAll" class="secondary" type="button">Mở tất cả</button>
+            <button id="hostObstacleOpenPicture" class="secondary" type="button">Mở ảnh</button>
+            <button id="hostObstacleStart" class="secondary" type="button">Start</button>
+          </div>
+        </div>
+        <div class="host-obstacle-control-columns">
+          <div class="host-obstacle-control-group">
+            <h2>HN</h2>
+            <div class="host-obstacle-number-list">
+              <button class="secondary" type="button" data-obstacle-row-reveal="1">1 (0)</button>
+              <button class="secondary" type="button" data-obstacle-row-reveal="2">2 (0)</button>
+              <button class="secondary" type="button" data-obstacle-row-reveal="3">3 (0)</button>
+              <button class="secondary" type="button" data-obstacle-row-reveal="4">4 (0)</button>
+              <button class="secondary" type="button" data-obstacle-row-reveal="5">5 (0)</button>
+            </div>
+          </div>
+          <div class="host-obstacle-control-group">
+            <h2>Đ</h2>
+            <div class="host-obstacle-number-list">
+              <button class="secondary" type="button" data-obstacle-judge="1" data-verdict="Đ">Đ</button>
+              <button class="secondary" type="button" data-obstacle-judge="2" data-verdict="Đ">Đ</button>
+              <button class="secondary" type="button" data-obstacle-judge="3" data-verdict="Đ">Đ</button>
+              <button class="secondary" type="button" data-obstacle-judge="4" data-verdict="Đ">Đ</button>
+              <button class="secondary" type="button" data-obstacle-judge="5" data-verdict="Đ">Đ</button>
+            </div>
+          </div>
+          <div class="host-obstacle-control-group">
+            <h2>S</h2>
+            <div class="host-obstacle-number-list">
+              <button class="secondary" type="button" data-obstacle-judge="1" data-verdict="S">S</button>
+              <button class="secondary" type="button" data-obstacle-judge="2" data-verdict="S">S</button>
+              <button class="secondary" type="button" data-obstacle-judge="3" data-verdict="S">S</button>
+              <button class="secondary" type="button" data-obstacle-judge="4" data-verdict="S">S</button>
+              <button class="secondary" type="button" data-obstacle-judge="5" data-verdict="S">S</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="panel host-score-panel"><div class="scorehead"><h2>Bảng điểm</h2><span id="playerCount" class="muted">0 người</span></div><div id="hostPlayers" class="players"></div></div>
     <div class="panel host-controls-panel">
@@ -78,7 +120,7 @@
       </div>
       <div class="controls"><button class="primary" id="startRound">MỞ CHUÔNG</button><button class="secondary" id="startRoundDelayed">MỞ CHUÔNG SAU 5S</button><button class="secondary" id="lockRound">KHÓA</button><button class="secondary" id="resetRound">RESET</button></div>
     </div>
-    <div class="panel host-answers-panel"><div class="answerhead"><div><h2>Câu trả lời mới nhất của mỗi thí sinh</h2><p class="muted">Thời gian tính từ lúc Host mở lượt.</p></div><span id="answerCount" class="muted">0 câu trả lời</span></div><div id="hostAnswers" class="answers"><p class="muted">Chưa có câu trả lời.</p></div></div>
+    <div class="panel host-answers-panel"><div class="answerhead"><div><h2>Câu trả lời mới nhất của mỗi thí sinh</h2><p class="muted">Thời gian tính từ lúc Host mở lượt.</p></div><div class="host-answer-actions"><span id="answerCount" class="muted">0 câu trả lời</span><button id="gradeAnswers" class="secondary" type="button" disabled>Chấm đáp án</button></div></div><div id="hostAnswers" class="answers"><p class="muted">Chưa có câu trả lời.</p></div></div>
     <div class="panel host-buzzes-panel"><div class="answerhead"><div><h2>Lịch sử bấm chuông</h2><p class="muted">Thứ tự theo thời điểm máy chủ nhận tín hiệu.</p></div><span id="buzzCount" class="muted">0 lượt</span></div><div id="hostBuzzes" class="answers"><p class="muted">Chưa có thí sinh bấm chuông.</p></div></div>
     <div class="independent-clock host-clock"><div class="independent-title"><div><h2>THỜI GIAN TRẢ LỜI</h2><p class="muted">Đồng hồ riêng cho ô trả lời của thí sinh.</p></div><strong id="hostIndependentDisplay">01:00</strong></div><div class="independent-controls"><label><input id="independentDuration" type="number" min="1" max="3600" value="60" aria-label="Thời gian trả lời bằng giây"></label><div class="independent-presets" aria-label="Thời lượng nhanh"><button class="secondary" type="button" data-independent-seconds="15">15s VCNV</button><button class="secondary" type="button" data-independent-seconds="20">20s TT</button><button class="secondary" type="button" data-independent-seconds="30">30s TT</button><button class="secondary" type="button" data-independent-seconds="40">40s TT</button></div><button class="primary" id="independentStart">BẮT ĐẦU</button><button class="secondary" id="independentPause">TẠM DỪNG</button><button class="secondary" id="independentReset">ĐẶT LẠI</button><button class="secondary answer-reveal-trigger" id="revealLatestAnswers" type="button">HIỆN ĐÁP ÁN</button><select id="speedQuestionSelect" aria-label="Chọn câu tăng tốc"><option value="">Chọn câu tăng tốc</option></select><button class="secondary" id="openSpeedQuestion" type="button">MỞ CÂU HỎI</button></div></div>
   </div>
@@ -148,6 +190,12 @@
 </section>
 <section id="projectorView" class="hidden projector-page">
   <button id="projectorFullscreen" class="projector-fullscreen" type="button" aria-label="Bật âm thanh và toàn màn hình">BẬT ÂM THANH / TOÀN MÀN HÌNH</button>
+  <div id="projectorObstacleView" class="projector-obstacle-view hidden" aria-label="Bảng Vượt chướng ngại vật">
+    <div id="projectorObstacleBuzzes" class="projector-obstacle-buzzes hidden" aria-label="Thứ tự thí sinh bấm chuông"></div>
+    <div id="projectorObstaclePicture" class="projector-obstacle-picture hidden" aria-hidden="true"></div>
+    <div id="projectorObstacleRows" class="projector-obstacle-rows" aria-hidden="true"></div>
+    <section class="projector-obstacle-question-box"><div id="projectorObstacleQuestion" class="projector-obstacle-question"></div><div id="projectorObstacleQuestionTimerBox" class="projector-obstacle-question-timer-box hidden" aria-hidden="true"><span id="projectorObstacleQuestionTimer" class="projector-question-timer"></span></div></section>
+  </div>
   <div class="projector-stage">
     <section class="projector-question-panel"><div id="projectorQuestion" class="projector-question">CÂU HỎI</div><div id="projectorQuestionTimerBox" class="projector-question-timer-box hidden" aria-hidden="true"><span id="projectorQuestionTimer" class="projector-question-timer"></span></div></section>
     <section class="projector-score-panel"><div id="projectorScoreboard" class="projector-scoreboard"></div></section>
