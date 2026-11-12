@@ -603,11 +603,18 @@ body,body.player-active{background:#000040;}
 @keyframes projector-obstacle-question-out{from{transform:translateY(0);opacity:1;}to{transform:translateY(110vh);opacity:0;}}
 @keyframes projector-finish-question-points-in{from{transform:translateY(100%);}to{transform:translateY(0);}}
 @keyframes projector-finish-question-points-out{from{transform:translateY(0);}to{transform:translateY(100%);}}
+@keyframes projector-speed-question-in{from{transform:translateX(-110vw);opacity:0;}to{transform:translateX(0);opacity:1;}}
+@keyframes projector-speed-media-in{from{transform:translateX(110vw);opacity:0;}to{transform:translateX(0);opacity:1;}}
 .projector-active .projector-page,.projector-active .projector-page *{font-family:Arial,sans-serif!important;font-weight:700!important;}
 #projectorView.projector-opening-individual-spotlight .projector-player.spotlight-player{background:#738cff!important;border-color:#aebcff!important;color:#fff!important;}
 .player-active.player-opening-individual-spotlight .player-score-panel .playerrow.spotlight-player{background:#738cff!important;border-color:#aebcff!important;color:#fff!important;}
 .projector-speed-mode .projector-player-layout{grid-template-columns:minmax(0,1fr);}
 .projector-speed-mode .projector-score-stack{display:none;}
+.projector-speed-media-pending .projector-player-layout .question-display{visibility:hidden;}
+.projector-speed-question-hidden #projectorPlayerQuestionText{transform:translateX(-110vw);opacity:0;}
+.projector-speed-question-hidden .projector-speed-media-area{transform:translateX(110vw);opacity:0;}
+.projector-speed-question-entering #projectorPlayerQuestionText{animation:projector-speed-question-in .8s cubic-bezier(0,0,.2,1) both;}
+.projector-speed-question-entering .projector-speed-media-area{animation:projector-speed-media-in .8s cubic-bezier(0,0,.2,1) both;}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active{box-sizing:border-box;grid-template-rows:12% 85%;gap:3%;padding:0;border:0;background:transparent;}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-text{box-sizing:border-box;width:100%;padding:clamp(8px,1vw,14px);border:4px solid #fff;background:#000040;}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-media{box-sizing:border-box;width:100%;border:4px solid #fff;background:#000040;}
