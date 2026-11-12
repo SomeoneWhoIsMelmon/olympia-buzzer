@@ -521,6 +521,7 @@ io.on('connection', socket => {
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (room.roundMode !== 'obstacle' || !Number.isInteger(row) || row < 1 || row > 5) return ack({ ok: false, error: 'Hàng ngang không hợp lệ.' });
     room.obstacleRowsSelected.add(row);
+    io.to(`${room.code}:projector`).emit('projector:obstacle:question-presentation', { action: 'show' });
     ack({ ok: true });
   });
   socket.on('host:obstacle:picture-open', (_payload, ack = () => {}) => {

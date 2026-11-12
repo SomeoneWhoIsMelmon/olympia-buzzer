@@ -224,7 +224,7 @@ body,body.player-active{background:#000040;}
 .projector-active .answer-reveal-content button{display:none;}
 .host-obstacle-reveal{display:grid;width:100%;height:100%;min-width:0;min-height:0;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);align-items:stretch;gap:clamp(5px,.7vw,10px);}
 .host-obstacle-image-column{display:grid;min-width:0;min-height:0;grid-template-rows:minmax(0,1fr) auto;gap:clamp(4px,.6vw,8px);}
-.host-obstacle-picture{position:relative;align-self:center;justify-self:center;width:100%;height:auto;max-height:100%;max-width:100%;aspect-ratio:3/2;overflow:hidden;border:2px solid #fff;background:#000020;}
+.host-obstacle-picture{position:relative;align-self:center;justify-self:center;width:100%;height:auto;max-height:100%;max-width:100%;aspect-ratio:16/9;overflow:hidden;border:2px solid #fff;background:#000020;}
 .host-obstacle-picture>img,.host-obstacle-picture>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
 .host-obstacle-picture>span{position:absolute;inset:0;display:grid;place-items:center;padding:6px;text-align:center;font-size:clamp(8px,1vw,13px);}
 .host-obstacle-picture .obstacle-mask{position:absolute;inset:0;width:100%;height:100%;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:#000040;color:#fff;box-shadow:none;}
@@ -306,7 +306,7 @@ body,body.player-active{background:#000040;}
 .projector-obstacle-view{position:absolute;inset:0;z-index:1;grid-template-rows:minmax(0,1.35fr) minmax(0,.7fr);align-items:stretch;gap:clamp(24px,6vh,64px);padding:7vh 6vw 6vh;background:transparent;color:#fff;}
 .projector-obstacle-picture{position:absolute;top:50%;left:50%;width:min(80vw,142.22vh);aspect-ratio:16/9;transform:translate(-50%,-50%);z-index:3;overflow:hidden;background:transparent;border:clamp(8px,1.2vw,18px) solid transparent;}
 .projector-obstacle-buzzes{position:absolute;left:0;top:27vh;z-index:5;display:flex;width:clamp(86px,11vw,210px);max-height:68vh;flex-direction:column;gap:2px;overflow:auto;}
-.projector-obstacle-buzz-entry{box-sizing:border-box;flex:none;height:clamp(39px,4.2vh,48px);overflow:hidden;padding:2px 4px;border:4px solid #fff;background:#e00000;color:#fff;text-align:center;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(10px,1.3vw,18px);font-style:italic;font-weight:900;}
+.projector-obstacle-buzz-entry{box-sizing:border-box;flex:none;height:clamp(39px,4.2vh,48px);overflow:hidden;padding:2px 4px;border:3px solid #fff;background:#e00000;color:#fff;text-align:center;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(10px,1.3vw,18px);font-style:italic;font-weight:900;}
 .projector-obstacle-picture>img,.projector-obstacle-picture>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
 .projector-obstacle-picture-empty{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:clamp(20px,3vw,48px);}
 .projector-obstacle-picture .projector-obstacle-mask{position:absolute;inset:0;background:transparent;filter:none;clip-path:none;}
@@ -330,6 +330,9 @@ body,body.player-active{background:#000040;}
 .projector-obstacle-circle.is-wrong{background:#4a0000;color:transparent;}
 .projector-obstacle-circle.is-selected{background:#0080ff;color:transparent;}
 .projector-obstacle-question-box{position:relative;display:flex;height:clamp(140px,22vh,280px);min-width:0;min-height:0;flex-direction:column;gap:8px;align-self:end;padding:clamp(10px,2vw,24px);border:4px solid #fff;background:#000040;color:#fff;}
+.projector-obstacle-question-hidden .projector-obstacle-question-box{transform:translateY(110vh);opacity:0;pointer-events:none;}
+.projector-obstacle-question-entering .projector-obstacle-question-box{animation:projector-obstacle-question-in .8s cubic-bezier(0,0,.2,1) both;}
+.projector-obstacle-question-exiting .projector-obstacle-question-box{animation:projector-obstacle-question-out .8s cubic-bezier(.4,0,1,1) both;}
 .projector-obstacle-question-timer-box{position:absolute;right:clamp(10px,2vw,24px);bottom:clamp(10px,2vw,24px);z-index:2;pointer-events:none;}
 .projector-obstacle-question-box h2{flex:none;margin:0;font-size:clamp(18px,2.7vw,34px);font-style:italic;font-weight:900;}
 .projector-obstacle-question{min-height:0;flex:1;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;font-size:clamp(12px,1.875vw,27px);line-height:1.2;}
@@ -596,6 +599,8 @@ body,body.player-active{background:#000040;}
 @keyframes projector-opening-question-in{from{transform:translateX(-110vw);opacity:0;}to{transform:translateX(0);opacity:1;}}
 @keyframes projector-opening-score-in{from{transform:translateX(110vw);opacity:0;}to{transform:translateX(0);opacity:1;}}
 @keyframes projector-opening-exit{from{transform:translateY(0);opacity:1;}to{transform:translateY(110vh);opacity:0;}}
+@keyframes projector-obstacle-question-in{from{transform:translateY(110vh);opacity:0;}to{transform:translateY(0);opacity:1;}}
+@keyframes projector-obstacle-question-out{from{transform:translateY(0);opacity:1;}to{transform:translateY(110vh);opacity:0;}}
 @keyframes projector-finish-question-points-in{from{transform:translateY(100%);}to{transform:translateY(0);}}
 @keyframes projector-finish-question-points-out{from{transform:translateY(0);}to{transform:translateY(100%);}}
 .projector-active .projector-page,.projector-active .projector-page *{font-family:Arial,sans-serif!important;font-weight:700!important;}
