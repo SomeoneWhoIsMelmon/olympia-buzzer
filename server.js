@@ -17,7 +17,7 @@ const clean = (s, max = 24) => String(s || '').trim().replace(/[<>]/g, '').slice
 function publicRoom(room) {
   return {
     code: room.code, status: room.status, duration: room.duration, question: room.question || '',
-    finishQuestionCount: room.finishQuestionSequence?.length || 0, finishQuestionIndex: room.finishQuestionIndex,
+    finishQuestionCount: room.finishQuestionSequence?.length || 0, finishQuestionPointsSequence: (room.finishQuestionSequence || []).map(question => question.points), finishAllowFortyQuestionFour: Boolean(room.finishAllowFortyQuestionFour), finishQuestionIndex: room.finishQuestionIndex,
     finishQuestionPoints: Number.isInteger(room.finishQuestionIndex) ? room.finishQuestionSequence?.[room.finishQuestionIndex]?.points ?? null : null,
     finishPlayerId: room.finishPlayerId || null, finishNshv: Boolean(room.finishNshv), finishStealPending: Boolean(room.finishStealPending),
     projectorVolume: room.projectorVolume,
@@ -187,7 +187,7 @@ io.on('connection', socket => {
       duration: Math.max(1, Math.min(300, Number(duration) || 5)),
       buzzerAlwaysOpen: true,
       teams: Array.isArray(teams) ? teams.slice(0, 12).map(t => clean(t, 20)).filter(Boolean) : ['Đội 1', 'Đội 2'],
-      players: new Map(), answers: [], buzzes: [], questions: [], speedQuestions: Array.from({ length: 4 }, () => ({ prompt: '', answer: '', media: null })), obstacleCourse: { rows: Array.from({ length: 4 }, () => ({ answer: '', answerCells: Array(15).fill(''), question: '' })), keyword: '', keywordQuestion: '', fullAnswer: '', media: null }, finishRounds: Array.from({ length: 4 }, () => Array.from({ length: 7 }, () => ({ question: '', answer: '' }))), finishQuestionSequence: [], finishQuestionRound: null, finishQuestionIndex: null, finishPlayerId: null, finishStealPending: false, finishStealNshv: false, roundMode: 'opening', activeSpeedQuestionSlot: null, databaseAccessToken: null, spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingStartArmed: false, openingEmptyQuestionNumber: null, openingDeadline: null, openingTimer: null, openingTimerKind: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, buzzerCountdownDeadline: null, buzzerCountdownTimer: null, winnerCountdownDeadline: null, winnerCountdownTimer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, startedAt: null, handle: null }
+      players: new Map(), answers: [], buzzes: [], questions: [], speedQuestions: Array.from({ length: 4 }, () => ({ prompt: '', answer: '', media: null })), obstacleCourse: { rows: Array.from({ length: 4 }, () => ({ answer: '', answerCells: Array(15).fill(''), question: '' })), keyword: '', keywordQuestion: '', fullAnswer: '', media: null }, finishRounds: Array.from({ length: 4 }, () => Array.from({ length: 7 }, () => ({ question: '', answer: '' }))), finishQuestionSequence: [], finishQuestionRound: null, finishQuestionIndex: null, finishQuestionPoints: null, finishAllowFortyQuestionFour: false, finishPlayerId: null, finishStealPending: false, finishStealNshv: false, roundMode: 'opening', activeSpeedQuestionSlot: null, databaseAccessToken: null, spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingStartArmed: false, openingEmptyQuestionNumber: null, openingDeadline: null, openingTimer: null, openingTimerKind: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, buzzerCountdownDeadline: null, buzzerCountdownTimer: null, winnerCountdownDeadline: null, winnerCountdownTimer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, startedAt: null, handle: null }
     };
     if (!room.teams.length) room.teams = ['Đội 1', 'Đội 2'];
     rooms.set(roomCode, room); socket.join(roomCode);
@@ -379,12 +379,14 @@ io.on('connection', socket => {
     }
     room.finishQuestionSequence = selectedQuestions.map((item, index) => ({ ...item, points: points[index] }));
     room.finishQuestionRound = round;
+    room.finishAllowFortyQuestionFour = Boolean(allowFortyQuestionFour);
     room.finishQuestionIndex = null;
     room.finishPlayerId = playerId;
     room.finishStealPending = false;
     room.finishStealNshv = false;
     room.question = '';
     emitRoom(room);
+    io.to(room.code).emit('projector:finish:presentation', { action: 'commit' });
     io.to(room.code).emit('projector:audio', { type: 'startTurnVD' });
     ack({ ok: true, count: room.finishQuestionSequence.length });
   });
@@ -417,12 +419,14 @@ io.on('connection', socket => {
     room.finishQuestionSequence = [];
     room.finishQuestionRound = null;
     room.finishQuestionIndex = null;
+    room.finishAllowFortyQuestionFour = false;
     room.finishPlayerId = null;
     room.finishNshv = false;
     room.finishStealPending = false;
     room.finishStealNshv = false;
     room.question = '';
     emitRoom(room);
+    io.to(room.code).emit('projector:finish:presentation', { action: 'end' });
     io.to(room.code).emit('projector:audio', { type: 'endTurnVD' });
     ack({ ok: true });
   });
@@ -715,6 +719,7 @@ io.on('connection', socket => {
     if (!['start', 'end', 'opening', 'blank', 'vcnv15', 'tt20', 'tt30', 'tt40', 'speedQuestionOpen', 'showAnswerVCNV', 'showAnswerTT', 'correctHN', 'wrongHN', 'pickHNCombined', 'openHN', 'openAll', 'openPiece', 'roundStartKD', 'roundStartVCNV', 'roundStartTT', 'roundStartVD', 'win', 'cang1', 'cang2', 'cang3', 'correctDP', 'wrongDP', 'stopAllSFX'].includes(type)) return ack({ ok: false, error: 'Lệnh âm thanh không hợp lệ.' });
     if (type === 'start') {
       room.openingStartArmed = room.spotlightRound === 'Lượt chung';
+      room.question = '';
       emitRoom(room);
     }
     if (type === 'end') {
@@ -734,7 +739,6 @@ io.on('connection', socket => {
       room.openingQuestionIndex = null;
       room.openingQuestionMode = '';
       room.openingEmptyQuestionNumber = null;
-      room.question = '';
       emitRoom(room);
     }
     io.to(room.code).emit('projector:audio', { type });
