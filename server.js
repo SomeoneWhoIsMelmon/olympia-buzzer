@@ -424,7 +424,6 @@ io.on('connection', socket => {
     room.finishNshv = false;
     room.finishStealPending = false;
     room.finishStealNshv = false;
-    room.question = '';
     emitRoom(room);
     io.to(room.code).emit('projector:finish:presentation', { action: 'end' });
     io.to(room.code).emit('projector:audio', { type: 'endTurnVD' });
@@ -447,6 +446,7 @@ io.on('connection', socket => {
     room.finishStealPending = false;
     room.finishStealNshv = false;
     resetFinishBuzzer(room);
+    room.question = '';
     emitRoom(room); ack({ ok: true });
     io.to(room.code).emit('projector:audio', { type: 'startVDCombined' });
   });
