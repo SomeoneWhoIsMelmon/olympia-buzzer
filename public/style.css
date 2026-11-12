@@ -333,6 +333,7 @@ body,body.player-active{background:#000040;}
 .projector-round-player-mode .projector-stage{display:none;}
 .projector-round-player-mode .projector-player-layout{position:absolute;inset:8vh 4.5vw 6vh;display:grid;grid-template-columns:minmax(0,1.9fr) minmax(250px,1fr);gap:clamp(8px,2vh,20px);align-items:stretch;}
 .projector-player-layout .question-display{height:auto;min-height:0;border:4px solid #fff;border-radius:0;background:#000040;color:#fff;font-style:normal;}
+.projector-player-layout .question-display{position:relative;}
 .projector-player-layout .question-display-text{min-height:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;}
 .projector-player-layout .question-display.round-media-active{display:grid;grid-template-rows:15% 85%;gap:0;align-items:stretch;padding:clamp(8px,1vw,14px);}
 .projector-player-layout .question-display.round-media-active .question-display-text{display:flex;align-items:center;justify-content:center;font-size:inherit;line-height:inherit;}
@@ -385,7 +386,13 @@ body,body.player-active{background:#000040;}
 .host-active .host-statusline{margin:0;justify-content:center;gap:clamp(12px,2vw,24px);}
 .host-active .host-controls-panel>h2{text-align:center;margin:0;}
 .host-active .host-controls-panel .timer{font-size:clamp(18px,2vw,28px);}
-.host-active .host-controls-panel .controls{grid-template-columns:1.25fr 1.65fr .8fr .8fr;}
+.host-active .host-statusline{justify-content:space-between;}
+.host-active .host-timer-audio{display:flex;min-width:0;align-items:center;gap:clamp(5px,.8vw,10px);}
+.host-active .host-timer-audio .timer{flex:none;}
+.host-active .host-control-sound-buttons{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;min-width:0;}
+.host-active .host-control-sound-buttons button{min-width:0;padding:4px 5px;border-radius:5px;font-size:clamp(8px,.8vw,11px);line-height:1.1;white-space:nowrap;}
+.host-active .host-controls-panel .controls{width:100%;min-width:0;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(3px,.5vw,8px);}
+.host-active .host-controls-panel .controls button{min-width:0;max-width:100%;padding:clamp(5px,.7vw,9px) 3px;font-size:clamp(8px,.85vw,12px);letter-spacing:0;line-height:1.1;white-space:normal;overflow-wrap:anywhere;}
 .host-active .host-future-panel,.host-active .host-controls-panel,.host-active .host-score-panel,.host-active .host-answers-panel,.host-active .host-buzzes-panel,.host-active .host-clock{min-width:0;min-height:0;}
 @media(max-width:650px){
  .host-active,.host-active .shell{height:auto;min-height:100vh;overflow:visible;}
@@ -399,6 +406,9 @@ body,body.player-active{background:#000040;}
  .host-obstacle-reveal{min-height:230px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);}
  .host-obstacle-reveal button{font-size:clamp(9px,2.4vw,13px);padding:6px 3px;}
  .host-active .host-round-settings{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);}
+ .host-active .host-statusline{justify-content:space-between;}
+ .host-active .host-timer-audio{gap:8px;}
+ .host-active .host-control-sound-buttons button{font-size:10px;}
 }
 .host-active .database-page{width:100%;max-width:1600px;min-height:0;flex:1;display:flex;flex-direction:column;gap:12px;margin:0 auto;color:#fff;}
 .host-active .database-header,.host-active .database-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:2px solid #fff;background:#000040;}
@@ -555,3 +565,13 @@ body,body.player-active{background:#000040;}
 .projector-obstacle-view{display:grid;}
 .projector-obstacle-question-box h2{font-style:italic!important;font-weight:900!important;}
 .projector-active .projector-page,.projector-active .projector-page *{font-family:Arial,sans-serif!important;font-weight:700!important;}
+.projector-speed-mode .projector-player-layout{grid-template-columns:minmax(0,1fr);}
+.projector-speed-mode .projector-score-stack{display:none;}
+.projector-speed-mode .projector-player-layout .question-display.round-media-active{box-sizing:border-box;grid-template-rows:12% 85%;gap:3%;padding:0;border:0;background:transparent;}
+.projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-text{box-sizing:border-box;width:100%;padding:clamp(8px,1vw,14px);border:4px solid #fff;background:#000040;}
+.projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-media{box-sizing:border-box;width:100%;border:4px solid #fff;background:#000040;}
+.projector-speed-media-area{position:relative;width:100%;height:100%;min-width:0;min-height:0;}
+.projector-speed-media-area .question-display-media{height:100%;}
+.projector-speed-question-timer-box{position:absolute;right:clamp(10px,2vw,24px);bottom:clamp(10px,2vw,24px);z-index:3;pointer-events:none;}
+.projector-speed-question-timer-box .projector-question-timer{opacity:.75;}
+@media(max-width:650px){.projector-speed-mode .projector-player-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);}}

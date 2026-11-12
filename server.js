@@ -712,7 +712,7 @@ io.on('connection', socket => {
   socket.on('host:opening:audio', ({ type } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
-    if (!['start', 'end', 'opening', 'blank', 'vcnv15', 'tt20', 'tt30', 'tt40', 'speedQuestionOpen', 'showAnswerVCNV', 'showAnswerTT', 'correctHN', 'wrongHN', 'pickHNCombined', 'openHN', 'openAll', 'openPiece'].includes(type)) return ack({ ok: false, error: 'Lệnh âm thanh không hợp lệ.' });
+    if (!['start', 'end', 'opening', 'blank', 'vcnv15', 'tt20', 'tt30', 'tt40', 'speedQuestionOpen', 'showAnswerVCNV', 'showAnswerTT', 'correctHN', 'wrongHN', 'pickHNCombined', 'openHN', 'openAll', 'openPiece', 'roundStartKD', 'roundStartVCNV', 'roundStartTT', 'roundStartVD', 'win', 'cang1', 'cang2', 'cang3', 'correctDP', 'wrongDP', 'stopAllSFX'].includes(type)) return ack({ ok: false, error: 'Lệnh âm thanh không hợp lệ.' });
     if (type === 'start') {
       room.openingStartArmed = room.spotlightRound === 'Lượt chung';
       emitRoom(room);
@@ -1148,7 +1148,7 @@ io.on('connection', socket => {
   socket.on('host:remove', ({ playerId } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
-    const p = room.players.get(playerId); if (p) { room.players.delete(playerId); room.answers = room.answers.filter(a => a.playerId !== playerId); if (room.spotlightPlayerId === playerId) room.spotlightPlayerId = null; const s = io.sockets.sockets.get(playerId); if (s) s.leave(room.code); }
+    const p = room.players.get(playerId); if (p) { const s = io.sockets.sockets.get(playerId); if (s) { s.emit('player:kicked'); s.leave(room.code); s.data.roomCode = null; s.data.role = null; } room.players.delete(playerId); room.answers = room.answers.filter(a => a.playerId !== playerId); if (room.spotlightPlayerId === playerId) room.spotlightPlayerId = null; }
     emitRoom(room); emitHostAnswers(room); ack({ ok: true });
   });
 
