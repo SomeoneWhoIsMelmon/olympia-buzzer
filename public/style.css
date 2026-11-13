@@ -524,6 +524,7 @@ body,body.player-active{background:#000040;}
 .database-page-active .database-questions{flex:none;max-height:none;overflow:visible;}
 .host-active .host-future-panel{display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:4px;text-align:left;}
 .intro-cue-grid{display:grid;flex:1;min-width:0;min-height:0;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:clamp(3px,.55vw,7px);padding:clamp(3px,.55vw,7px);border:0;background:transparent;}
+.intro-advisor-buttons,.intro-number-buttons{display:grid;grid-column:span 2;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(3px,.55vw,7px);min-width:0;min-height:0;}
 .intro-cue-grid button{min-width:0;min-height:0;padding:2px;border:2px solid #fff;border-radius:0;background:#000040;color:#fff;font-family:Georgia,serif;font-size:clamp(9px,.95vw,17px);font-style:italic;font-weight:900;letter-spacing:0;line-height:1.05;white-space:normal;overflow-wrap:anywhere;}
 .host-active .host-future-panel h2{margin:0;color:#fff;text-align:center;font-size:clamp(13px,1.3vw,18px);}
 .opening-question-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);align-items:stretch;gap:4px;min-width:0;min-height:0;height:100%;flex:1;}
@@ -597,8 +598,8 @@ body,body.player-active{background:#000040;}
 .projector-obstacle-question-box h2{font-style:italic!important;font-weight:900!important;}
 .projector-opening-hidden .projector-question-panel{transform:translateX(-110vw);opacity:0;pointer-events:none;}
 .projector-opening-hidden .projector-score-panel{transform:translateX(110vw);opacity:0;pointer-events:none;}
-.projector-opening-entering .projector-question-panel{animation:projector-opening-question-in .8s cubic-bezier(0,0,.2,1) 4s both;}
-.projector-opening-entering .projector-score-panel{animation:projector-opening-score-in .8s cubic-bezier(0,0,.2,1) 4s both;}
+.projector-opening-entering .projector-question-panel{animation:projector-opening-question-in .8s cubic-bezier(0,0,.2,1) both;}
+.projector-opening-entering .projector-score-panel{animation:projector-opening-score-in .8s cubic-bezier(0,0,.2,1) both;}
 .projector-opening-exiting .projector-question-panel,.projector-opening-exiting .projector-score-panel{animation:projector-opening-exit .8s cubic-bezier(.4,0,1,1) 1s both;}
 .projector-finish-hidden .projector-question-panel{transform:translateX(-110vw);opacity:0;pointer-events:none;}
 .projector-finish-hidden .projector-score-panel{transform:translateX(110vw);opacity:0;pointer-events:none;}
@@ -615,11 +616,11 @@ body,body.player-active{background:#000040;}
 .projector-finish-starting .projector-finish-point-tile{animation:projector-finish-points-in .8s cubic-bezier(0,0,.2,1) 4.5s both;}
 .projector-finish-starting .projector-finish-question-markers{animation:projector-finish-marker-slot-in .8s cubic-bezier(0,0,.2,1) 5.5s both;}
 .projector-finish-starting .projector-finish-question-markers span{animation:projector-finish-markers-in .8s cubic-bezier(0,0,.2,1) 5.5s both;}
-.projector-finish-start-exiting{animation:projector-finish-points-out 1s cubic-bezier(.4,0,1,1) 1s both;}
+.projector-finish-start-exiting{animation:projector-finish-points-out .7s cubic-bezier(.4,0,1,1) 1s both;}
 @keyframes projector-finish-points-in{from{transform:translateX(120vw);opacity:0;}to{transform:translateX(0);opacity:1;}}
 @keyframes projector-finish-marker-slot-in{from{width:0;}to{width:var(--marker-size);}}
 @keyframes projector-finish-markers-in{from{transform:translateX(clamp(90px,13vw,176px));opacity:0;}to{transform:translateX(0);opacity:1;}}
-@keyframes projector-finish-points-out{from{transform:translateY(0);opacity:1;}to{transform:translateY(110vh);opacity:0;}}
+@keyframes projector-finish-points-out{from{transform:translateY(0);}to{transform:translateY(calc(100vh + 100%));}}
 @keyframes projector-opening-question-in{from{transform:translateX(-110vw);opacity:0;}to{transform:translateX(0);opacity:1;}}
 @keyframes projector-opening-score-in{from{transform:translateX(110vw);opacity:0;}to{transform:translateX(0);opacity:1;}}
 @keyframes projector-opening-exit{from{transform:translateY(0);opacity:1;}to{transform:translateY(110vh);opacity:0;}}
