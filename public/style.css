@@ -424,6 +424,10 @@ body,body.player-active{background:#000040;}
 .host-active .database-page.media-only .database-toolbar,.host-active .database-page.media-only .database-import-note,.host-active .database-page.media-only .database-speed-grid,.host-active .database-page.media-only .database-obstacle-course,.host-active .database-page.media-only #databaseFinishRounds,.host-active .database-page.media-only #databaseQuestions{display:none;}
 .host-active .database-page.media-only .database-speed-grid{grid-template-columns:repeat(4,minmax(0,1fr));}
 .host-active .database-page.media-only .database-intro-media-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;flex:1;align-content:start;}
+.database-speed-answer-media-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+.host-active .database-page.media-only .database-speed-answer-media-grid{display:none;}
+@media(max-width:900px){.database-speed-answer-media-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:480px){.database-speed-answer-media-grid{grid-template-columns:minmax(0,1fr);}}
 .database-intro-media-card{display:flex;min-width:0;min-height:260px;flex-direction:column;gap:8px;padding:8px;border:3px solid #fff;background:#000040;color:#fff;}
 .database-intro-media-top{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:8px;}
 .database-intro-media-top h2{flex:none;margin:0;color:#fff;font-size:clamp(14px,1.35vw,20px);}
@@ -525,6 +529,16 @@ body,body.player-active{background:#000040;}
 .host-active .host-future-panel{display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:4px;text-align:left;}
 .intro-cue-grid{display:grid;flex:1;min-width:0;min-height:0;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:clamp(3px,.55vw,7px);padding:clamp(3px,.55vw,7px);border:0;background:transparent;}
 .intro-advisor-buttons,.intro-number-buttons{display:grid;grid-column:span 2;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(3px,.55vw,7px);min-width:0;min-height:0;}
+.host-bonus-layout{display:grid;grid-template-rows:minmax(0,2fr) minmax(0,.9fr) minmax(0,.9fr);gap:clamp(3px,.6vw,8px);flex:1;min-width:0;min-height:0;}
+.host-bonus-numbers{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:clamp(3px,.6vw,8px);min-width:0;min-height:0;}
+.host-bonus-actions{display:grid;grid-template-columns:4fr 3fr 3fr;gap:clamp(3px,.6vw,8px);min-width:0;min-height:0;}
+.host-bonus-layout button{min-width:0;min-height:0;padding:2px;border:3px solid #fff;border-radius:0;background:#000040;color:#fff;font-family:Arial,sans-serif;font-size:clamp(9px,1.1vw,20px);font-style:normal;font-weight:700;letter-spacing:0;line-height:1.1;}
+.host-bonus-numbers button{font-size:clamp(9px,1.2vw,22px);}
+.host-bonus-numbers button.is-selected{background:#00a000;}
+.host-speed-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,3fr);align-items:stretch;gap:clamp(8px,1vw,16px);flex:1;min-width:0;min-height:0;}
+.host-speed-answer-buttons{display:grid;grid-template-rows:repeat(4,minmax(0,1fr));gap:clamp(4px,.7vh,10px);min-width:0;min-height:0;}
+.host-speed-answer-buttons button{min-width:0;min-height:0;padding:4px;border:3px solid #fff;border-radius:0;background:#000040;color:#fff;font-size:clamp(8px,1vw,18px);font-weight:700;letter-spacing:0;}
+.host-speed-layout p{align-self:center;margin:0;color:#fff;text-align:center;font-size:clamp(12px,1.6vw,28px);font-style:normal;font-weight:700;line-height:1.2;}
 .intro-cue-grid button{min-width:0;min-height:0;padding:2px;border:2px solid #fff;border-radius:0;background:#000040;color:#fff;font-family:Georgia,serif;font-size:clamp(9px,.95vw,17px);font-style:italic;font-weight:900;letter-spacing:0;line-height:1.05;white-space:normal;overflow-wrap:anywhere;}
 .host-active .host-future-panel h2{margin:0;color:#fff;text-align:center;font-size:clamp(13px,1.3vw,18px);}
 .opening-question-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);align-items:stretch;gap:4px;min-width:0;min-height:0;height:100%;flex:1;}
@@ -596,6 +610,11 @@ body,body.player-active{background:#000040;}
 .finish-round-action-grid #finishQuestionPointsDisplay{background:#738CFF;color:#fff;}
 .projector-obstacle-view{display:grid;}
 .projector-obstacle-question-box h2{font-style:italic!important;font-weight:900!important;}
+.projector-bonus-hidden .projector-question-panel{transform:translateX(-110vw);opacity:0;pointer-events:none;}
+.projector-bonus-hidden .projector-score-panel{transform:translateX(110vw);opacity:0;pointer-events:none;}
+.projector-bonus-entering .projector-question-panel{animation:projector-opening-question-in .8s cubic-bezier(0,0,.2,1) both;}
+.projector-bonus-entering .projector-score-panel{animation:projector-opening-score-in .8s cubic-bezier(0,0,.2,1) both;}
+.projector-bonus-exiting .projector-question-panel,.projector-bonus-exiting .projector-score-panel{animation:projector-opening-exit .8s cubic-bezier(.4,0,1,1) both;pointer-events:none;}
 .projector-opening-hidden .projector-question-panel{transform:translateX(-110vw);opacity:0;pointer-events:none;}
 .projector-opening-hidden .projector-score-panel{transform:translateX(110vw);opacity:0;pointer-events:none;}
 .projector-opening-entering .projector-question-panel{animation:projector-opening-question-in .8s cubic-bezier(0,0,.2,1) both;}
@@ -644,6 +663,7 @@ body,body.player-active{background:#000040;}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-text{box-sizing:border-box;width:100%;padding:clamp(8px,1vw,14px);border:4px solid #fff;background:#000040;}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-media{box-sizing:border-box;width:100%;border:4px solid #fff;background:#000040;}
 .projector-speed-media-area{position:relative;width:100%;height:100%;min-width:0;min-height:0;}
+.projector-speed-answer-overlay{position:absolute;inset:0;z-index:2;box-sizing:border-box;width:100%;height:100%;object-fit:contain;border:4px solid #fff;background:#000040;}
 .projector-speed-media-area .question-display-media{height:100%;}
 .projector-speed-question-timer-box{position:absolute;right:clamp(10px,2vw,24px);bottom:clamp(10px,2vw,24px);z-index:3;pointer-events:none;}
 .projector-speed-question-timer-box .projector-question-timer{opacity:.75;}

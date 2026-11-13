@@ -33,12 +33,27 @@ function publicRoom(room) {
     spotlightRound: room.spotlightRound || '', spotlightPlayerId: room.spotlightPlayerId || null,
     openingQuestionRound: room.openingQuestionRound || '', openingQuestionIndex: Number.isInteger(room.openingQuestionIndex) ? room.openingQuestionIndex : null,
     openingQuestionMode: room.openingQuestionMode || '', openingStartArmed: Boolean(room.openingStartArmed), openingEmptyQuestionNumber: Number.isInteger(room.openingEmptyQuestionNumber) ? room.openingEmptyQuestionNumber : null,
+    bonusRemainingMs: room.bonusRemainingMs ?? 15000,
+    bonusStarted: Boolean(room.bonusStarted), bonusArmed: Boolean(room.bonusArmed),
     roundMode: room.roundMode || 'opening', obstacleStarted: Boolean(room.obstacleStarted), obstacleSelectedRow: room.obstacleSelectedRow || null, obstacleRowsSelected: [...(room.obstacleRowsSelected || [])], obstaclePictureOpen: Boolean(room.obstaclePictureOpen), obstaclePictureRevealed: [...(room.obstaclePictureRevealed || [])], obstaclePictureEverRevealed: [...(room.obstaclePictureEverRevealed || [])], obstacleBuzzOrder: room.obstacleBuzzOrder || [],
     players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, team: p.team, score: p.score, connected: p.connected, focused: p.focused !== false, buzzedAt: p.buzzedAt, obstacleBuzzed: Boolean(p.obstacleBuzzed), obstacleBuzzUsed: Boolean(p.obstacleBuzzUsed), obstacleBuzzJudged: Boolean(p.obstacleBuzzJudged), answerSubmitted: Boolean(p.answerSubmitted), latestAnswer: p.latestAnswer || null })),
     teams: room.teams, answerCount: room.answers.length, independentTimer: { duration: room.independentTimer.duration, running: room.independentTimer.running, deadline: room.independentTimer.deadline, remainingMs: room.independentTimer.running && room.independentTimer.deadline ? Math.max(0, room.independentTimer.deadline - Date.now()) : room.independentTimer.remainingMs, startedAt: room.independentTimer.startedAt }
   };
 }
 function emitRoom(room) { io.to(room.code).emit('room:update', publicRoom(room)); }
+function bonusAudio(room, playing) {
+  io.to(`${room.code}:projector`).emit('projector:bonus:audio', { playing, offset: (15000 - (room.bonusRemainingMs ?? 15000)) / 1000 });
+}
+function runBonusClock(room) {
+  stopTimer(room);
+  room.status = 'playing'; room.winnerId = null;
+  room.deadline = Date.now() + room.bonusRemainingMs;
+  bonusAudio(room, true);
+  room.timer = setTimeout(() => {
+    room.bonusRemainingMs = 0; lockRoom(room, 'timeout'); emitRoom(room);
+  }, room.bonusRemainingMs);
+  emitRoom(room);
+}
 function emitHostAnswers(room) { if (room.hostId) io.to(room.hostId).emit('answers:update', room.answers); }
 function obstacleBonus(room) { return 70 - 10 * Math.max(room.obstacleRowsSelected?.size || 0, room.obstaclePictureEverRevealed?.size || 0, Object.keys(room.obstacleVerdicts || {}).length); }
 function openAllObstacle(room) {
@@ -134,6 +149,9 @@ function startBuzzerRound(room, duration, preserveOpening = false) {
   room.status = 'playing'; room.deadline = Date.now() + room.duration * 1000;
   room.timer = setTimeout(() => {
     if (room.deadline && Date.now() >= room.deadline && ['playing', 'won'].includes(room.status)) {
+      if (room.roundMode === 'opening' && (room.openingQuestionRound || room.spotlightRound) === 'Lượt chung' && room.duration === 5 && !room.winnerId && !room.buzzes.length) {
+        io.to(`${room.code}:projector`).emit('projector:audio', { type: 'wrong' });
+      }
       room.status = 'locked'; room.deadline = null; room.timer = null; emitRoom(room);
     }
   }, room.duration * 1000);
@@ -195,7 +213,7 @@ io.on('connection', socket => {
       duration: Math.max(1, Math.min(300, Number(duration) || 5)),
       buzzerAlwaysOpen: true,
       teams: Array.isArray(teams) ? teams.slice(0, 12).map(t => clean(t, 20)).filter(Boolean) : ['Đội 1', 'Đội 2'],
-      players: new Map(), answers: [], buzzes: [], questions: [], introMedia: [...introMediaDefaults, ...Array(7).fill(null)], speedQuestions: Array.from({ length: 4 }, () => ({ prompt: '', answer: '', media: null })), obstacleCourse: { rows: Array.from({ length: 4 }, () => ({ answer: '', answerCells: Array(15).fill(''), question: '' })), keyword: '', keywordQuestion: '', fullAnswer: '', media: null }, finishRounds: Array.from({ length: 4 }, () => Array.from({ length: 7 }, () => ({ question: '', answer: '' }))), finishQuestionSequence: [], finishQuestionRound: null, finishQuestionIndex: null, finishQuestionPoints: null, finishAllowFortyQuestionFour: false, finishPlayerId: null, finishStealPending: false, finishStealNshv: false, roundMode: 'opening', activeSpeedQuestionSlot: null, databaseAccessToken: null, spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingStartArmed: false, openingEmptyQuestionNumber: null, openingDeadline: null, openingTimer: null, openingTimerKind: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, buzzerCountdownDeadline: null, buzzerCountdownTimer: null, winnerCountdownDeadline: null, winnerCountdownTimer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, startedAt: null, handle: null }
+      players: new Map(), answers: [], buzzes: [], questions: [], introMedia: [...introMediaDefaults, ...Array(11).fill(null)], speedQuestions: Array.from({ length: 4 }, () => ({ prompt: '', answer: '', media: null })), obstacleCourse: { rows: Array.from({ length: 4 }, () => ({ answer: '', answerCells: Array(15).fill(''), question: '' })), keyword: '', keywordQuestion: '', fullAnswer: '', media: null }, finishRounds: Array.from({ length: 4 }, () => Array.from({ length: 7 }, () => ({ question: '', answer: '' }))), finishQuestionSequence: [], finishQuestionRound: null, finishQuestionIndex: null, finishQuestionPoints: null, finishAllowFortyQuestionFour: false, finishPlayerId: null, finishStealPending: false, finishStealNshv: false, roundMode: 'intro', activeSpeedQuestionSlot: null, databaseAccessToken: null, spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingStartArmed: false, openingEmptyQuestionNumber: null, openingDeadline: null, openingTimer: null, openingTimerKind: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, buzzerCountdownDeadline: null, buzzerCountdownTimer: null, winnerCountdownDeadline: null, winnerCountdownTimer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, startedAt: null, handle: null }
     };
     if (!room.teams.length) room.teams = ['Đội 1', 'Đội 2'];
     rooms.set(roomCode, room); socket.join(roomCode);
@@ -278,6 +296,20 @@ io.on('connection', socket => {
     if (!room || socket.data.role !== 'player') return ack({ ok: false, error: 'Không tìm thấy phòng.' });
     const player = room.players.get(socket.id);
     if (!player) return ack({ ok: false, error: 'Không tìm thấy người chơi.' });
+    if (room.roundMode === 'bonus') {
+      if (!room.bonusStarted) {
+        if (!room.bonusArmed || room.status !== 'playing' || player.buzzedAt) return ack({ ok: false, error: 'Chuông đang khóa.' });
+        player.buzzedAt = Date.now();
+        room.buzzes.push({ id: crypto.randomUUID(), playerId: player.id, name: player.name, team: player.team, receivedAt: player.buzzedAt, elapsedMs: 0 });
+        emitRoom(room); return ack({ ok: true, premature: true });
+      }
+      if (room.status !== 'playing' || !room.deadline || Date.now() >= room.deadline || player.buzzedAt) return ack({ ok: false, error: 'Chuông đang khóa.' });
+      room.bonusRemainingMs = Math.max(0, room.deadline - Date.now());
+      stopTimer(room); room.deadline = null; room.status = 'won'; room.winnerId = player.id;
+      player.buzzedAt = Date.now();
+      room.buzzes.push({ id: crypto.randomUUID(), playerId: player.id, name: player.name, team: player.team, receivedAt: player.buzzedAt, elapsedMs: 15000 - room.bonusRemainingMs });
+      bonusAudio(room, false); emitRoom(room); return ack({ ok: true });
+    }
     if (room.roundMode === 'obstacle') {
       if (!room.obstacleStarted) return ack({ ok: false, error: 'Chuông Vượt chướng ngại vật chưa mở.' });
       if (player.obstacleBuzzUsed) return ack({ ok: false, error: 'Bạn đã bấm chuông Vượt chướng ngại vật rồi.' });
@@ -347,6 +379,12 @@ io.on('connection', socket => {
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (typeof clearAnswers !== 'boolean') return ack({ ok: false, error: 'Trạng thái xóa câu trả lời không hợp lệ.' });
     if (resetBuzzer) stopBuzzerCountdown(room);
+    if (room.roundMode === 'bonus') {
+      stopTimer(room); stopWinnerCountdown(room); room.deadline = null; room.status = 'playing'; room.bonusRemainingMs = 15000; room.bonusStarted = false; room.bonusArmed = true;
+      room.winnerId = null; room.buzzes = [];
+      for (const player of room.players.values()) player.buzzedAt = null;
+      bonusAudio(room, false);
+    }
     room.question = String(question || '').trim().slice(0, 500);
     room.obstacleSelectedRow = room.roundMode === 'obstacle' && Number.isInteger(obstacleRow) && obstacleRow >= 1 && obstacleRow <= 5 ? obstacleRow : null;
     if (room.roundMode === 'obstacle' && Number.isInteger(obstacleRow) && obstacleRow >= 1 && obstacleRow <= 5) room.obstacleRowsSelected.add(obstacleRow);
@@ -366,6 +404,7 @@ io.on('connection', socket => {
     }
     emitRoom(room);
     if (clearAnswers) { emitHostAnswers(room); io.to(room.code).emit('projector:answer:hide'); }
+    if (room.roundMode === 'bonus') io.to(`${room.code}:projector`).emit('projector:bonus:presentation', { show: true });
     ack({ ok: true });
   });
   socket.on('host:finish:commit', ({ round, playerId, points, allowFortyQuestionFour } = {}, ack = () => {}) => {
@@ -508,7 +547,19 @@ io.on('connection', socket => {
     if (openMedia && round !== 'speed') return ack({ ok: false, error: 'Chỉ có thể mở media cho câu Tăng tốc.' });
     if (round === 'speed' && speedSlot !== undefined && speedSlot !== null && (!Number.isInteger(speedSlot) || speedSlot < 0 || speedSlot >= room.speedQuestions.length)) return ack({ ok: false, error: 'Câu Tăng tốc không hợp lệ.' });
     if (openMedia && !Number.isInteger(speedSlot)) return ack({ ok: false, error: 'Hãy chọn câu Tăng tốc trước khi mở media.' });
+    if (room.roundMode === 'bonus' && round !== 'bonus') { stopTimer(room); room.deadline = null; room.status = 'locked'; room.bonusStarted = false; room.bonusArmed = false; bonusAudio(room, false); }
     room.roundMode = round;
+    room.buzzes = [];
+    room.winnerId = null;
+    room.obstacleBuzzOrder = [];
+    stopWinnerCountdown(room);
+    if (room.status === 'won') room.status = room.deadline && Date.now() < room.deadline ? 'playing' : 'locked';
+    for (const player of room.players.values()) {
+      player.buzzedAt = null;
+      player.obstacleBuzzed = false;
+      player.obstacleBuzzUsed = false;
+      player.obstacleBuzzJudged = false;
+    }
     if (round === 'intro') io.to(`${room.code}:projector`).emit('projector:video:stop');
     if (round !== 'intro') io.to(`${room.code}:projector`).emit('projector:intro:hide');
     if (round === 'obstacle') { room.obstacleVerdicts = {}; room.obstacleStarted = false; room.obstacleSelectedRow = null; room.obstacleRowsSelected.clear(); room.obstaclePictureOpen = false; room.obstaclePictureRevealed.clear(); room.obstaclePictureEverRevealed.clear(); room.obstacleBuzzOrder = []; room.buzzes = []; for (const player of room.players.values()) { player.buzzedAt = null; player.obstacleBuzzed = false; player.obstacleBuzzUsed = false; player.obstacleBuzzJudged = false; } }
@@ -516,6 +567,35 @@ io.on('connection', socket => {
     emitRoom(room);
     emitActiveRoundMedia(room);
     if (round === 'obstacle') emitProjectorObstacleAnswers(room);
+    ack({ ok: true });
+  });
+  socket.on('host:bonus:select', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room) || room.roundMode !== 'bonus') return ack({ ok: false, error: 'Hãy chọn phần Câu hỏi phụ.' });
+    io.to(`${room.code}:projector`).emit('projector:bonus:presentation', { show: false });
+    ack({ ok: true });
+  });
+  socket.on('host:bonus:control', ({ action } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room) || room.roundMode !== 'bonus') return ack({ ok: false, error: 'Hãy chọn phần Câu hỏi phụ.' });
+    if (action === 'start') {
+      if (room.bonusStarted || !room.bonusArmed || !room.question) return ack({ ok: false, error: 'Hãy mở câu hỏi trước khi bắt đầu lượt mới.' });
+      stopBuzzerCountdown(room); stopWinnerCountdown(room); stopOpeningTimer(room);
+      room.bonusRemainingMs = 15000; room.bonusStarted = true; room.roundStartedAt = Date.now();
+      room.buzzes = []; room.winnerId = null;
+      runBonusClock(room);
+    } else if (['correct', 'wrong'].includes(action)) {
+      if (room.status !== 'won' || !room.winnerId) return ack({ ok: false, error: 'Chưa có thí sinh bấm chuông.' });
+      if (action === 'correct') {
+        room.bonusStarted = true; lockRoom(room); bonusAudio(room, false);
+        io.to(`${room.code}:projector`).emit('projector:audio', { type: 'correctHN' }); emitRoom(room);
+      } else {
+        room.buzzes = room.buzzes.filter(buzz => buzz.playerId !== room.winnerId);
+        room.winnerId = null;
+        if (room.bonusRemainingMs > 0) runBonusClock(room);
+        else { lockRoom(room, 'timeout'); emitRoom(room); }
+      }
+    } else return ack({ ok: false, error: 'Lệnh không hợp lệ.' });
     ack({ ok: true });
   });
   socket.on('host:intro:play', ({ slot } = {}, ack = () => {}) => {
@@ -526,6 +606,16 @@ io.on('connection', socket => {
     const media = room.introMedia[slot];
     if (!media) return ack({ ok: false, error: 'Chưa có media cho Intro này trong MEDIADATABASE.' });
     io.to(`${room.code}:projector`).emit('projector:intro:media', { name: media.name, type: media.type, data: media.data });
+    ack({ ok: true });
+  });
+  socket.on('host:speed:answer-media', ({ index } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (room.roundMode !== 'speed' || !Number.isInteger(index) || index < 0 || index > 3) return ack({ ok: false, error: 'Hãy chọn phần thi Tăng tốc và đáp án hợp lệ.' });
+    const media = room.introMedia[12 + index];
+    if (!media) return ack({ ok: false, error: `Chưa có media TT${index + 1}Ans trong Database.` });
+    if (!media.type.startsWith('image/')) return ack({ ok: false, error: 'Media đáp án phải là ảnh.' });
+    io.to(`${room.code}:projector`).emit('projector:speed:answer-media', { name: media.name, type: media.type, data: media.data });
     ack({ ok: true });
   });
   socket.on('host:obstacle:verdict', ({ row, verdict } = {}, ack = () => {}) => {
@@ -731,7 +821,7 @@ io.on('connection', socket => {
     } else if (points !== undefined) {
       return ack({ ok: false, error: 'Câu trả lời sai không thay đổi điểm.' });
     }
-    io.to(room.code).emit('projector:audio', { type: result });
+    io.to(room.code).emit('projector:audio', { type: result === 'correct' ? 'correctKD' : result });
     ack({ ok: true });
   });
   socket.on('host:opening:audio', ({ type } = {}, ack = () => {}) => {
@@ -951,8 +1041,8 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     if (!Number.isInteger(slot) || slot < 0 || slot >= room.introMedia.length) return ack({ ok: false, error: 'Ô Intro không hợp lệ.' });
-    const maxSize = slot === 4 ? 30 * 1024 * 1024 : 10 * 1024 * 1024;
-    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > maxSize) return ack({ ok: false, error: `File media phải có dung lượng tối đa ${slot === 4 ? 30 : 10} MB.` });
+    const maxSize = 30 * 1024 * 1024;
+    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > maxSize) return ack({ ok: false, error: `File media phải có dung lượng tối đa 30 MB.` });
     if (typeof type !== 'string' || !/^(image|video)\/[a-z0-9.+-]+$/i.test(type)) return ack({ ok: false, error: 'Chỉ hỗ trợ file ảnh hoặc video.' });
     if (typeof name !== 'string' || !name.trim() || name.length > 255) return ack({ ok: false, error: 'Tên file media không hợp lệ.' });
     const safeName = name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 255);
@@ -977,7 +1067,7 @@ io.on('connection', socket => {
   socket.on('host:database:obstacle-media:set', ({ name, type, data } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
-    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 10 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 10 MB.' });
+    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 30 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 30 MB.' });
     if (typeof type !== 'string' || !/^(image|video)\/[a-z0-9.+-]+$/i.test(type)) return ack({ ok: false, error: 'Chỉ hỗ trợ file ảnh hoặc video.' });
     if (typeof name !== 'string' || !name.trim() || name.length > 255) return ack({ ok: false, error: 'Tên file media không hợp lệ.' });
     const safeName = name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 255);
@@ -1048,7 +1138,7 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     if (!Number.isInteger(slot) || slot < 0 || slot >= room.speedQuestions.length) return ack({ ok: false, error: 'Ô Tăng tốc không hợp lệ.' });
-    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 10 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 10 MB.' });
+    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 30 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 30 MB.' });
     if (typeof type !== 'string' || !/^(image|video)\/[a-z0-9.+-]+$/i.test(type)) return ack({ ok: false, error: 'Chỉ hỗ trợ file ảnh hoặc video.' });
     if (typeof name !== 'string' || !name.trim() || name.length > 255) return ack({ ok: false, error: 'Tên file media không hợp lệ.' });
     const safeName = name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 255);
@@ -1092,7 +1182,7 @@ io.on('connection', socket => {
     emitHostDatabaseQuestions(room);
     ack({ ok: true, questions: room.questions, imported: imported.length });
   });
-  socket.on('host:database:import-document', ({ questions, openingSheetIncluded = false, speedQuestions, obstacleCourse, finishSheetIncluded = false, finishRounds } = {}, ack = () => {}) => {
+  socket.on('host:database:import-document', ({ questions, openingSheetIncluded = false, bonusSheetIncluded = false, speedQuestions, obstacleCourse, finishSheetIncluded = false, finishRounds } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     if (!Array.isArray(questions) || questions.length > 2000 || typeof openingSheetIncluded !== 'boolean' || typeof finishSheetIncluded !== 'boolean' || (speedQuestions !== null && (!Array.isArray(speedQuestions) || speedQuestions.length !== 4)) || (obstacleCourse !== null && obstacleCourse !== undefined && (!obstacleCourse || !Array.isArray(obstacleCourse.rows) || obstacleCourse.rows.length !== 4)) || (finishSheetIncluded && (!Array.isArray(finishRounds) || finishRounds.length !== 4 || finishRounds.some(round => !Array.isArray(round) || round.length !== 7))) || (finishRounds !== null && finishRounds !== undefined && (!Array.isArray(finishRounds) || finishRounds.length !== 4 || finishRounds.some(round => !Array.isArray(round) || round.length !== 7)))) return ack({ ok: false, error: 'Dữ liệu workbook không hợp lệ.' });
@@ -1120,8 +1210,9 @@ io.on('connection', socket => {
       normalizedFinishRounds?.some(round => round.some(item => !item)) ||
       (normalizedObstacleCourse && [normalizedObstacleCourse.keyword, normalizedObstacleCourse.keywordQuestion, normalizedObstacleCourse.fullAnswer].some(value => typeof value !== 'string' || value.length > 5000)) ||
       (!imported.length && !normalizedSpeedQuestions?.some(question => question.prompt || question.answer) && !normalizedObstacleCourse?.rows.some(row => row.answer || row.question) && ![normalizedObstacleCourse?.keyword, normalizedObstacleCourse?.keywordQuestion, normalizedObstacleCourse?.fullAnswer].some(Boolean) && !normalizedFinishRounds?.some(round => round.some(item => item.question || item.answer)))) return ack({ ok: false, error: 'Dữ liệu câu hỏi trong workbook không hợp lệ hoặc workbook không có nội dung.' });
-    if (openingSheetIncluded) room.questions = imported;
-    else room.questions.push(...imported);
+    if (typeof bonusSheetIncluded !== 'boolean') return ack({ ok: false, error: 'Dữ liệu sheet CHP không hợp lệ.' });
+    room.questions = room.questions.filter(question => question.round === 'Câu hỏi phụ' ? !bonusSheetIncluded : !openingSheetIncluded);
+    room.questions.push(...imported);
     normalizedSpeedQuestions?.forEach((question, index) => {
       room.speedQuestions[index].prompt = question.prompt;
       room.speedQuestions[index].answer = question.answer;

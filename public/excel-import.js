@@ -89,7 +89,8 @@ window.parseOlympiaWorkbook = async file => {
   const speedData = readSheet('Tăng tốc B', true);
   const obstacleData = readSheet('VCNV', true);
   const finishData = readSheet('Về đích', true);
-  if (!openingData && !speedData && !obstacleData && !finishData) throw new Error('Không tìm thấy sheet “Khởi Động”, “Tăng tốc B”, “VCNV” hoặc “Về đích” trong workbook.');
+  const bonusData = readSheet('CHP', true);
+  if (!openingData && !speedData && !obstacleData && !finishData && !bonusData) throw new Error('Không tìm thấy sheet “Khởi Động”, “Tăng tốc B”, “VCNV”, “Về đích” hoặc “CHP” trong workbook.');
   const questions = [];
   if (openingData) {
     const groups = [
@@ -118,6 +119,13 @@ window.parseOlympiaWorkbook = async file => {
       }
     }
   }
+  if (bonusData) {
+    for (let row = 3; row <= 22; row++) {
+      const prompt = bonusData.valuesByCell.get(`C${row}`) || '';
+      if (!prompt) continue;
+      questions.push({ round: 'Câu hỏi phụ', prompt, answer: bonusData.valuesByCell.get(`D${row}`) || '', notes: '', points: 0, sourceSheet: 'CHP', sourceRow: row - 2, rawData: { 'Ô nguồn': `C${row}`, 'Ô đáp án': `D${row}` } });
+    }
+  }
   const speedQuestions = speedData ? Array.from({ length: 4 }, (_, index) => {
     const row = index + 3;
     return {
@@ -128,8 +136,8 @@ window.parseOlympiaWorkbook = async file => {
   const obstacleCourse = obstacleData ? {
     rows: Array.from({ length: 4 }, (_, index) => {
       const row = index + 3;
-      const answer = Array.from({ length: 15 }, (_, column) => obstacleData.valuesByCell.get(`${String.fromCharCode(66 + column)}${row}`) || '').join('');
-      return { answer, question: obstacleData.valuesByCell.get(`V${row}`) || '' };
+      const answerCells = Array.from({ length: 15 }, (_, column) => obstacleData.valuesByCell.get(`${String.fromCharCode(66 + column)}${row}`) || '');
+      return { answer: answerCells.join(''), answerCells, question: obstacleData.valuesByCell.get(`V${row}`) || '' };
     }),
     keyword: obstacleData.valuesByCell.get('B7') || '',
     keywordQuestion: obstacleData.valuesByCell.get('V7') || '',
@@ -150,5 +158,5 @@ window.parseOlympiaWorkbook = async file => {
   if (!questions.length && !speedQuestions?.some(question => question.prompt || question.answer) && !hasObstacleCourse && !hasFinishRounds) {
     throw new Error('Không tìm thấy câu hỏi hoặc đáp án trong các ô đã chỉ định ở các sheet.');
   }
-  return { questions, openingSheetIncluded: Boolean(openingData), speedQuestions, obstacleCourse, finishSheetIncluded: Boolean(finishData), finishRounds };
+  return { questions, openingSheetIncluded: Boolean(openingData), bonusSheetIncluded: Boolean(bonusData), speedQuestions, obstacleCourse, finishSheetIncluded: Boolean(finishData), finishRounds };
 };
