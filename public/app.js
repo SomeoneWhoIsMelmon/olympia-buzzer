@@ -156,6 +156,7 @@ function updateHostRoundButtons(round){
  });
  $('hostView').querySelector('.opening-question-layout').classList.toggle('hidden',round!=='opening');
  $('hostView').querySelector('.finish-round-layout').classList.toggle('hidden',round!=='finish');
+ $('hostView').querySelector('.intro-cue-grid').classList.toggle('hidden',round!=='intro');
  $('hostObstacleReveal').classList.toggle('hidden',round!=='obstacle');
  $('hostView').querySelector('.host-future-panel').classList.toggle('finish-round-active',round==='finish');
 }
