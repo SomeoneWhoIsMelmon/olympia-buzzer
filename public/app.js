@@ -1,8 +1,9 @@
 const socket = io();
 const $ = id => document.getElementById(id);
 const views = ['home','hostSetup','playerSetup','hostView','hostDatabase','playerView','projectorView'];
-let role = null, roomCode = null, myId = null, myTeam = null, latest = null, hostLink = null, lastStatus = null, audioCtx = null, projectorMasterGain = null, projectorVolume = 1, tickHandle = null, independentTickHandle = setInterval(updateIndependentTimer, 100), projectorAudioQueue = [], projectorAudioBuffers = new Map(), projectorAudioReady = false, projectorAudioLoading = new Map(), projectorAudioResumePending = false, projectorAudioGeneration = 0, projectorActiveAudioSources = new Set(), projectorOpeningMusicSource = null, projectorOpeningMusicKey = null, projectorOpeningMusicGeneration = 0, projectorOpeningAnimationTimeout = null, projectorOpeningPresentationActive = false, projectorFinishAnimationTimeout = null, projectorFinishPresentationActive = false, projectorFinishStartExitTimeout = null, databaseQuestions = [], speedQuestionSlots = Array.from({length:4},()=>({prompt:'',media:null})), obstacleCourse = {rows:Array.from({length:4},()=>({answer:'',question:''})),keyword:'',fullAnswer:'',media:null}, projectorObstacleAnswerCells = Array.from({length:4},()=>Array(15).fill('')), speedMediaObjectUrls = Array(4).fill(null), speedMediaLoadVersions = Array(4).fill(0), obstacleMediaObjectUrl = null, activeRoundMediaObjectUrl = null, activeRoundMedia = null, activeRoundMediaVersion = 0, videoPlaybackRequestId = 0, pendingSpeedVideoPlayback = false, openingCorrectStreak = 0, openingStreakPlayerId = '', openingScorePending = false, activeSpeedQuestionSlot = null;
+let role = null, roomCode = null, myId = null, myTeam = null, latest = null, hostLink = null, lastStatus = null, audioCtx = null, projectorMasterGain = null, projectorVolume = 1, tickHandle = null, independentTickHandle = setInterval(updateIndependentTimer, 100), projectorAudioQueue = [], projectorAudioBuffers = new Map(), projectorAudioReady = false, projectorAudioLoading = new Map(), projectorAudioResumePending = false, projectorAudioGeneration = 0, projectorActiveAudioSources = new Set(), projectorOpeningMusicSource = null, projectorOpeningMusicKey = null, projectorOpeningMusicGeneration = 0, projectorOpeningAnimationTimeout = null, projectorOpeningPresentationActive = false, projectorFinishAnimationTimeout = null, projectorFinishPresentationActive = false, projectorFinishStartExitTimeout = null, databaseQuestions = [], introMediaSlots = Array(8).fill(null), introMediaObjectUrls = Array(8).fill(null), introMediaLoadVersions = Array(8).fill(0), speedQuestionSlots = Array.from({length:4},()=>({prompt:'',media:null})), obstacleCourse = {rows:Array.from({length:4},()=>({answer:'',question:''})),keyword:'',fullAnswer:'',media:null}, projectorObstacleAnswerCells = Array.from({length:4},()=>Array(15).fill('')), speedMediaObjectUrls = Array(4).fill(null), speedMediaLoadVersions = Array(4).fill(0), obstacleMediaObjectUrl = null, activeRoundMediaObjectUrl = null, activeRoundMedia = null, activeRoundMediaVersion = 0, videoPlaybackRequestId = 0, pendingSpeedVideoPlayback = false, openingCorrectStreak = 0, openingStreakPlayerId = '', openingScorePending = false, activeSpeedQuestionSlot = null;
 let finishRounds = Array.from({length:4},()=>Array.from({length:7},()=>({question:'',answer:''})));
+let projectorIntroMediaObjectUrl = null;
 let obstacleMediaLoadVersion = 0;
 let projectorObstacleQuestionTimeout = null;
 let projectorSpeedQuestionTimeout = null;
@@ -107,6 +108,10 @@ $('hostView').querySelectorAll('[data-host-round]').forEach(button=>button.addEv
  const result=await emitAck('host:round-mode',data);
  if(!result.ok)toast(result.error);
  else{updateHostRoundButtons(data.round);const soundType={opening:'roundStartKD',obstacle:'roundStartVCNV',speed:'roundStartTT',finish:'roundStartVD'}[data.round];if(soundType){const soundResult=await emitAck('host:opening:audio',{type:soundType});if(!soundResult.ok)toast(soundResult.error);}}
+}));
+$('hostView').querySelectorAll('[data-intro-media-play]').forEach(button=>button.addEventListener('click',async()=>{
+ const result=await emitAck('host:intro:play',{slot:Number(button.dataset.introMediaPlay)});
+ if(!result.ok)toast(result.error);
 }));
 $('hostObstaclePicture').addEventListener('click',async event=>{const button=event.target.closest('[data-obstacle-tile]');if(!button)return;const tile=button.dataset.obstacleTile;hostObstacleRevealed.has(tile)?hostObstacleRevealed.delete(tile):hostObstacleRevealed.add(tile);renderHostObstacleBoard();const result=await emitAck('host:obstacle:reveal',{tile,open:hostObstacleRevealed.has(tile)});if(!result.ok)toast(result.error);const soundResult=await emitAck('host:opening:audio',{type:'openPiece'});if(!soundResult.ok)toast(soundResult.error);});
 document.querySelectorAll('[data-obstacle-reveal]').forEach(button=>button.addEventListener('click',async()=>{const tile=button.dataset.obstacleReveal;hostObstacleRevealed.has(tile)?hostObstacleRevealed.delete(tile):hostObstacleRevealed.add(tile);renderHostObstacleBoard();const result=await emitAck('host:obstacle:reveal',{tile,open:hostObstacleRevealed.has(tile)});if(!result.ok)toast(result.error);const soundResult=await emitAck('host:opening:audio',{type:'openPiece'});if(!soundResult.ok)toast(soundResult.error);}));
@@ -245,8 +250,10 @@ $('speedQuestionSelect').addEventListener('change',async()=>{
  if(!result.ok)toast(result.error);
 });
 $('openProjector').onclick=()=>{const projector=window.open(`${location.origin}/?projector=${encodeURIComponent(roomCode)}`,'_blank');if(!projector)toast('Trình duyệt đã chặn cửa sổ máy chiếu. Hãy cho phép cửa sổ bật lên rồi thử lại.');};
-openDatabase.onclick=()=>{show('hostDatabase');loadDatabase();};
-closeDatabase.onclick=()=>show('hostView');
+function setMediaDatabaseMode(enabled){$('hostDatabase').classList.toggle('media-only',enabled);$('introMediaSlots').classList.toggle('hidden',!enabled);$('databaseViewTitle').textContent=enabled?'MEDIADATABASE':'DATABASE CÂU HỎI';$('databaseViewDescription').textContent=enabled?'Các media được lưu trong phòng thi.':'Ngân hàng câu hỏi riêng của phòng này; dữ liệu chỉ tồn tại trong phiên chạy máy chủ.';$('speedQuestionSlots').querySelectorAll('.database-speed-card h2').forEach((heading,index)=>{heading.textContent=enabled?`Media ${index+1}`:`Tăng tốc ${index+1}`;});}
+openDatabase.onclick=()=>{setMediaDatabaseMode(false);show('hostDatabase');loadDatabase();};
+$('openMedia').onclick=()=>{setMediaDatabaseMode(true);show('hostDatabase');loadDatabase();};
+closeDatabase.onclick=()=>{setMediaDatabaseMode(false);show('hostView');};
 $('clearDatabase').onclick=async()=>{
  if(!databaseQuestions.length)return;
  if(!confirm(`Xóa toàn bộ ${databaseQuestions.length} câu hỏi khỏi Database của phòng này?`))return;
@@ -285,6 +292,43 @@ $('importWorkbook').onclick=async()=>{
   toast(`${openingResult}; ${workbookData.speedQuestions?'đã cập nhật 4 câu Tăng tốc':'giữ nguyên câu Tăng tốc'}; ${workbookData.obstacleCourse?'đã cập nhật bảng Vượt chướng ngại vật':'giữ nguyên bảng Vượt chướng ngại vật'}; ${workbookData.finishSheetIncluded?'đã cập nhật 4 bảng Về đích.':'giữ nguyên 4 bảng Về đích.'}`);
  }catch(error){toast(`Không thể nhập file Excel: ${error.message}`);}
 };
+function renderIntroMediaSlots(){
+ introMediaSlots.forEach((media,index)=>{
+  const card=$('introMediaSlots').querySelector(`[data-intro-media-slot="${index}"]`),preview=card.querySelector('.database-intro-media-preview');
+  introMediaLoadVersions[index]++;
+  const version=introMediaLoadVersions[index];
+  if(introMediaObjectUrls[index]){URL.revokeObjectURL(introMediaObjectUrls[index]);introMediaObjectUrls[index]=null;}
+  preview.replaceChildren();
+  card.querySelector('.database-intro-media-name').textContent=media?media.name:'Tối đa 10 MB';
+  card.querySelector('.database-intro-media-button').textContent=media?'XÓA MEDIA':'CHỌN MEDIA';
+  if(!media){const placeholder=document.createElement('span');placeholder.textContent=card.querySelector('h2').textContent;preview.append(placeholder);return;}
+  preview.textContent='Đang tải media…';
+  emitAck('host:database:intro-media:get',{slot:index}).then(result=>{
+   if(version!==introMediaLoadVersions[index])return;
+   if(!result.ok){toast(result.error);preview.textContent='Không thể tải media.';return;}
+   introMediaObjectUrls[index]=URL.createObjectURL(new Blob([result.media.data],{type:result.media.type}));
+   const element=document.createElement(result.media.type.startsWith('video/')?'video':'img');element.src=introMediaObjectUrls[index];
+   if(element instanceof HTMLVideoElement){element.controls=true;element.preload='metadata';element.playsInline=true;}else element.alt=result.media.name;
+   preview.replaceChildren(element);
+  }).catch(error=>{if(version===introMediaLoadVersions[index]){preview.textContent='Không thể tải media.';toast(`Không thể tải media ${card.querySelector('h2').textContent}: ${error.message}`);}});
+ });
+}
+$('introMediaSlots').querySelectorAll('.database-intro-media-card').forEach(card=>{
+ const slot=Number(card.dataset.introMediaSlot),button=card.querySelector('.database-intro-media-button'),fileInput=card.querySelector('.database-intro-media-file');
+ button.addEventListener('click',async()=>{
+  if(introMediaSlots[slot]){button.disabled=true;const result=await emitAck('host:database:intro-media:delete',{slot});button.disabled=false;if(!result.ok)return toast(result.error);introMediaSlots[slot]=null;renderIntroMediaSlots();return;}
+  fileInput.click();
+ });
+ fileInput.addEventListener('change',async()=>{
+  const file=fileInput.files[0];if(!file)return;
+  if(file.size>10*1024*1024){fileInput.value='';return toast('File media không được vượt quá 10 MB.');}
+  if(!/^(image|video)\//i.test(file.type)){fileInput.value='';return toast('Chỉ hỗ trợ file ảnh hoặc video.');}
+  button.disabled=true;
+  try{const result=await emitAck('host:database:intro-media:set',{slot,name:file.name,type:file.type,data:await file.arrayBuffer()});if(!result.ok)return toast(result.error);introMediaSlots[slot]=result.media;introMediaLoadVersions[slot]++;if(introMediaObjectUrls[slot])URL.revokeObjectURL(introMediaObjectUrls[slot]);introMediaObjectUrls[slot]=URL.createObjectURL(file);const preview=card.querySelector('.database-intro-media-preview'),element=document.createElement(file.type.startsWith('video/')?'video':'img');element.src=introMediaObjectUrls[slot];if(element instanceof HTMLVideoElement){element.controls=true;element.preload='metadata';element.playsInline=true;}else element.alt=file.name;preview.replaceChildren(element);card.querySelector('.database-intro-media-name').textContent=file.name;button.textContent='XÓA MEDIA';}
+  catch(error){toast(`Không thể tải media lên: ${error.message}`);}
+  finally{button.disabled=false;fileInput.value='';}
+ });
+});
 $('speedQuestionSlots').querySelectorAll('.database-speed-card').forEach(card=>{
  const slot=Number(card.dataset.speedSlot),prompt=card.querySelector('.database-speed-prompt'),answer=card.querySelector('.database-speed-answer'),button=card.querySelector('.database-speed-media-button'),fileInput=card.querySelector('.database-speed-file');
  const saveTextField=async(field,input)=>{
@@ -587,6 +631,7 @@ if((lastStatus==='playing'||lastStatus==='locked')&&state.status==='won')sound('
 function render(state){
  renderBase(state);
  if(!state)return;
+ if(role==='projector'&&state.roundMode!=='intro')hideProjectorIntroMedia();
  if(role==='player')document.body.classList.toggle('player-opening-individual-spotlight',state.roundMode==='opening'&&Boolean(state.spotlightPlayerId)&&state.spotlightRound!=='Lượt chung');
  if(role==='projector'){
   const opening=state.roundMode==='opening',view=$('projectorView');
@@ -596,7 +641,7 @@ function render(state){
   if(finish&&!projectorFinishPresentationActive){projectorFinishPresentationActive=true;clearProjectorFinishAnimationTimeout();view.classList.remove('projector-finish-entering','projector-finish-exiting');if(state.finishQuestionCount)view.classList.remove('projector-finish-hidden');else view.classList.add('projector-finish-hidden');}
   else if(!finish){projectorFinishPresentationActive=false;clearProjectorFinishAnimationTimeout();view.classList.remove('projector-finish-hidden','projector-finish-entering','projector-finish-exiting');hideProjectorFinishStartGraphic();}
  }
- if(role==='projector'){const obstacle=state.roundMode==='obstacle',speed=state.roundMode==='speed',individualOpening=state.roundMode==='opening'&&Boolean(state.spotlightPlayerId)&&state.spotlightRound!=='Lượt chung',started=Boolean(state.obstacleStarted);$('projectorView').classList.toggle('projector-speed-mode',speed);$('projectorView').classList.toggle('projector-opening-individual-spotlight',individualOpening);$('projectorView').classList.toggle('projector-obstacle-mode',obstacle);$('projectorView').classList.toggle('projector-obstacle-started',obstacle&&started);$('projectorObstacleView').classList.toggle('hidden',!obstacle||!started);renderProjectorFinishStartGraphic(state);if(obstacle&&started){renderProjectorObstacle(state);renderProjectorObstacleBuzzes(state);}}
+ if(role==='projector'){const intro=state.roundMode==='intro',obstacle=state.roundMode==='obstacle',speed=state.roundMode==='speed',individualOpening=state.roundMode==='opening'&&Boolean(state.spotlightPlayerId)&&state.spotlightRound!=='Lượt chung',started=Boolean(state.obstacleStarted);$('projectorView').classList.toggle('projector-intro-mode',intro);$('projectorView').classList.toggle('projector-speed-mode',speed);$('projectorView').classList.toggle('projector-opening-individual-spotlight',individualOpening);$('projectorView').classList.toggle('projector-obstacle-mode',obstacle);$('projectorView').classList.toggle('projector-obstacle-started',obstacle&&started);$('projectorObstacleView').classList.toggle('hidden',!obstacle||!started);renderProjectorFinishStartGraphic(state);if(obstacle&&started){renderProjectorObstacle(state);renderProjectorObstacleBuzzes(state);}}
  if(role==='player'&&state.roundMode==='obstacle'){const me=state.players.find(player=>player.id===myId),canBuzz=Boolean(state.obstacleStarted&&me&&!me.obstacleBuzzUsed),canAnswer=Boolean(state.independentTimer?.running&&state.independentTimer.remainingMs>0&&me&&!me.obstacleBuzzUsed);$('buzzButton').disabled=!canBuzz;$('buzzButton').classList.toggle('ready',canBuzz);$('buzzButton').classList.toggle('pressed',Boolean(me?.obstacleBuzzed));$('answerInput').disabled=!canAnswer;$('submitAnswer').disabled=!canAnswer;}
  if(role==='host'){$('hostObstacleOpenPicture').classList.toggle('is-picture-open',Boolean(state.obstaclePictureOpen));const revealed=new Set(state.obstaclePictureRevealed||[]);if(revealed.size!==hostObstacleRevealed.size||[...revealed].some(tile=>!hostObstacleRevealed.has(tile))){hostObstacleRevealed=revealed;renderHostObstacleBoard();}}
  if(role==='player'){renderPlayerQuestion(state);const player=state.players.find(item=>item.id===myId);if(!player?.latestAnswer){$('lastAnswerText').textContent='';$('lastAnswerTime').textContent='';}}
@@ -685,6 +730,19 @@ function playSpeedVideo(video){
  pendingSpeedVideoPlayback=false;
  video.play().catch(error=>{if(error.name!=='AbortError')toast(`Không thể phát video câu Tăng tốc: ${error.message}`);});
 }
+function hideProjectorIntroMedia(){const container=$('projectorIntroMedia');if(!container)return;container.querySelector('video')?.pause();container.replaceChildren();container.classList.add('hidden');container.setAttribute('aria-hidden','true');if(projectorIntroMediaObjectUrl){URL.revokeObjectURL(projectorIntroMediaObjectUrl);projectorIntroMediaObjectUrl=null;}}
+socket.on('projector:intro:media',media=>{
+ if(role!=='projector'||!media?.data)return;
+ const container=$('projectorIntroMedia');hideProjectorIntroMedia();
+ projectorIntroMediaObjectUrl=URL.createObjectURL(new Blob([media.data],{type:media.type}));
+ const element=document.createElement(media.type.startsWith('video/')?'video':'img');element.src=projectorIntroMediaObjectUrl;
+ let videoStarted=false;const startVideo=()=>{if(videoStarted)return;videoStarted=true;element.currentTime=0;element.play().catch(error=>toast(`Không thể phát media IntroKD: ${error.message}`));};
+ if(element instanceof HTMLVideoElement){element.autoplay=true;element.controls=false;element.preload='auto';element.playsInline=true;element.volume=1;element.addEventListener('loadedmetadata',startVideo,{once:true});}
+ else element.alt=media.name||'IntroKD';
+ container.replaceChildren(element);container.classList.remove('hidden');container.setAttribute('aria-hidden','false');
+ if(element instanceof HTMLVideoElement&&element.readyState>=1)startVideo();
+});
+socket.on('projector:intro:hide',hideProjectorIntroMedia);
 socket.on('round:media',media=>{
  if(role==='host'){
   if(latest?.roundMode!=='obstacle')return;
@@ -744,7 +802,7 @@ function scoreRow(p,actions,highlight=false,judgeSteal=false){const row=document
 async function changeScore(playerId,delta){const r=await emitAck('host:score',{playerId,delta});if(!r.ok){toast(r.error);return false;}return true;}
 async function judgeObstacleBuzzer(playerId,correct){let expectedPoints;if(correct){const preview=await emitAck('host:obstacle:bonus',{playerId});if(!preview.ok)return toast(preview.error);expectedPoints=preview.points;if(!window.confirm(`Bạn có muốn cộng thêm cho thí sinh này ${expectedPoints} điểm do trả lời đúng CNV không?`))return;}const result=await emitAck('host:obstacle:judge',{playerId,correct,expectedPoints});if(!result.ok){toast(result.error);return;}if(correct){for(let tile=1;tile<=5;tile++)hostObstacleRevealed.add(String(tile));hostObstacleVerdicts=Object.fromEntries([1,2,3,4,5].map(row=>[row,'Đ']));renderHostObstacleBoard();}toast(correct?`Đã cộng ${result.points} điểm CNV.`:'Đã ghi nhận thí sinh trả lời sai.');}
 function renderHostPlayers(players,fastestId,state){$('hostPlayers').innerHTML='';if(!players.length){$('hostPlayers').innerHTML='<p class="muted">Chưa có người chơi. Chia sẻ mã phòng để mọi người tham gia.</p>';return;}players.forEach(p=>{const row=scoreRow(p,true,p.id===fastestId,Boolean(state?.roundMode==='finish'&&state.finishStealPending&&fastestId===p.id));if(state?.roundMode==='obstacle'&&p.obstacleBuzzed&&!p.obstacleBuzzJudged){const actions=row.querySelector('.scoreactions');for(const [label,correct] of [['Đúng',true],['Sai',false]]){const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=()=>judgeObstacleBuzzer(p.id,correct);actions?.append(button);}}$('hostPlayers').append(row);});}
-async function loadDatabase(){const r=await emitAck('host:database:get');if(!r.ok){toast(r.error);show(role==='database'?'home':'hostView');return;}databaseQuestions=r.questions;speedQuestionSlots=(Array.isArray(r.speedQuestions)?r.speedQuestions:[]).slice(0,4);while(speedQuestionSlots.length<4)speedQuestionSlots.push({prompt:'',answer:'',media:null});speedQuestionSlots.forEach(slot=>{slot.answer||='';});obstacleCourse=r.obstacleCourse||{rows:Array.from({length:4},()=>({answer:'',question:''})),keyword:'',fullAnswer:''};obstacleCourse.rows=Array.from({length:4},(_,index)=>obstacleCourse.rows?.[index]||{answer:'',question:''});finishRounds=Array.from({length:4},(_,round)=>Array.from({length:7},(_,index)=>r.finishRounds?.[round]?.[index]||{question:'',answer:''}));renderObstacleCourse();renderFinishRounds();renderSpeedQuestionSlots();renderSpeedQuestionSelect();renderDatabase();refreshSpotlightControls(latest);syncHostOpeningAnswer(latest);}
+async function loadDatabase(){const r=await emitAck('host:database:get');if(!r.ok){toast(r.error);show(role==='database'?'home':'hostView');return;}databaseQuestions=r.questions;introMediaSlots=(Array.isArray(r.introMedia)?r.introMedia:[]).slice(0,8);while(introMediaSlots.length<8)introMediaSlots.push(null);speedQuestionSlots=(Array.isArray(r.speedQuestions)?r.speedQuestions:[]).slice(0,4);while(speedQuestionSlots.length<4)speedQuestionSlots.push({prompt:'',answer:'',media:null});speedQuestionSlots.forEach(slot=>{slot.answer||='';});obstacleCourse=r.obstacleCourse||{rows:Array.from({length:4},()=>({answer:'',question:''})),keyword:'',fullAnswer:''};obstacleCourse.rows=Array.from({length:4},(_,index)=>obstacleCourse.rows?.[index]||{answer:'',question:''});finishRounds=Array.from({length:4},(_,round)=>Array.from({length:7},(_,index)=>r.finishRounds?.[round]?.[index]||{question:'',answer:''}));renderIntroMediaSlots();renderObstacleCourse();renderFinishRounds();renderSpeedQuestionSlots();renderSpeedQuestionSelect();renderDatabase();refreshSpotlightControls(latest);syncHostOpeningAnswer(latest);}
 function renderFinishRounds(){
  const container=$('databaseFinishRounds');
  container.replaceChildren();
