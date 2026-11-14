@@ -668,3 +668,45 @@ body,body.player-active{background:#000040;}
 .projector-speed-question-timer-box{position:absolute;right:clamp(10px,2vw,24px);bottom:clamp(10px,2vw,24px);z-index:3;pointer-events:none;}
 .projector-speed-question-timer-box .projector-question-timer{opacity:.75;}
 @media(max-width:650px){.projector-speed-mode .projector-player-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);}}
+
+.projector-summary{display:none;}
+.projector-summary-mode .projector-question-stack,.projector-summary-mode .projector-score-panel,.projector-summary-mode .projector-player-layout{display:none;}
+.projector-summary-mode .projector-summary{display:grid;grid-column:1/-1;grid-row:1;justify-self:center;width:46%;height:100%;min-height:0;grid-template-rows:minmax(0,1fr) minmax(0,3fr);gap:0;}
+.projector-summary-name,.projector-summary-score{min-height:0;box-sizing:border-box;border:2px solid #fff;border-radius:6px;background:#000040;}
+.projector-summary-name,.projector-summary-score{display:flex;align-items:center;justify-content:center;padding:0 12px;color:#fff;font-weight:900;overflow:hidden;text-align:center;}
+.projector-summary-name{justify-self:center;width:45%;min-width:0;background:#e6b800;color:#000040;border:0;font-size:clamp(14px,2.2vw,32px);line-height:1.1;overflow-wrap:anywhere;}
+.projector-summary-score{font-size:clamp(44px,6.8vw,98px);line-height:1;font-variant-numeric:tabular-nums;}
+
+.projector-summary.is-hidden{visibility:hidden;transform:translateY(100vh);}
+.projector-summary.is-entering{animation:projector-summary-in .8s cubic-bezier(0,0,.2,1) both;}
+.projector-summary.is-exiting{animation:projector-summary-out .8s cubic-bezier(.4,0,1,1) both;}
+@keyframes projector-summary-in{from{transform:translateY(100vh);}to{transform:translateY(0);}}
+@keyframes projector-summary-out{from{transform:translateY(0);}to{transform:translateY(100vh);}}
+
+.projector-player,.projector-player-layout .player-score-panel .playerrow{border-radius:6px;}
+
+.projector-question-panel,.projector-obstacle-question-box,.projector-player-layout .question-display,.projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-text,.projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-media{border-width:3px;border-radius:6px;}
+
+.projector-player,.projector-player-layout .player-score-panel .playerrow{border-width:3px;}
+
+.host-active .host-room-status{display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.host-active .host-room-status .status{white-space:nowrap;}
+
+.host-active .host-control-video-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;min-width:0;}
+.host-active .host-control-video-buttons button{min-width:0;padding:4px 5px;border-radius:5px;font-size:clamp(8px,.8vw,11px);line-height:1.1;white-space:nowrap;}
+
+.host-active .host-timer-audio{display:grid;width:100%;grid-template-columns:auto repeat(6,minmax(0,1fr));grid-template-rows:repeat(2,auto);gap:3px;}
+.host-active .host-control-cue-buttons{display:contents;}
+.host-active .host-timer-audio .timer{grid-column:1;grid-row:1/3;align-self:center;margin-right:6px;}
+.host-active .host-control-cue-buttons .host-control-sound-buttons,.host-active .host-control-cue-buttons .host-control-video-buttons{display:contents;}
+.host-active .host-control-cue-buttons button{width:100%;padding:4px;letter-spacing:0;}
+
+.projector-video-overlay{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:#000;overflow:hidden;}
+.projector-video-overlay::backdrop{background:#000;}
+#projectorVideoOverlayContent{width:100%;height:100%;}
+#projectorVideoOverlayContent img,#projectorVideoOverlayContent video{display:block;width:100%;height:100%;object-fit:contain;}
+
+.host-active #greenScreen.is-active{background:#00ff00;color:#000040;}
+.projector-active.projector-green-screen{background:#00ff00;}
+
+.projector-obstacle-green-question .projector-obstacle-rows{visibility:hidden;}

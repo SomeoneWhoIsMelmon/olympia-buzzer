@@ -28,11 +28,12 @@ function publicRoom(room) {
     finishQuestionCount: room.finishQuestionSequence?.length || 0, finishQuestionPointsSequence: (room.finishQuestionSequence || []).map(question => question.points), finishAllowFortyQuestionFour: Boolean(room.finishAllowFortyQuestionFour), finishQuestionIndex: room.finishQuestionIndex,
     finishQuestionPoints: Number.isInteger(room.finishQuestionIndex) ? room.finishQuestionSequence?.[room.finishQuestionIndex]?.points ?? null : null,
     finishPlayerId: room.finishPlayerId || null, finishNshv: Boolean(room.finishNshv), finishStealPending: Boolean(room.finishStealPending),
-    projectorVolume: room.projectorVolume,
+    projectorVolume: room.projectorVolume, greenScreen: Boolean(room.greenScreen), speedQuestionOpened: Boolean(room.speedQuestionOpened), obstacleGreenScreenQuestion: Boolean(room.obstacleGreenScreenQuestion),
     deadline: room.deadline, openingDeadline: room.openingDeadline || null, buzzerCountdownDeadline: room.buzzerCountdownDeadline || null, winnerCountdownDeadline: room.winnerCountdownDeadline || null, buzzerAlwaysOpen: room.buzzerAlwaysOpen, winnerId: room.winnerId, buzzes: room.buzzes || [],
     spotlightRound: room.spotlightRound || '', spotlightPlayerId: room.spotlightPlayerId || null,
     openingQuestionRound: room.openingQuestionRound || '', openingQuestionIndex: Number.isInteger(room.openingQuestionIndex) ? room.openingQuestionIndex : null,
     openingQuestionMode: room.openingQuestionMode || '', openingStartArmed: Boolean(room.openingStartArmed), openingEmptyQuestionNumber: Number.isInteger(room.openingEmptyQuestionNumber) ? room.openingEmptyQuestionNumber : null,
+    summaryPresentation: room.summaryPresentation || null,
     bonusRemainingMs: room.bonusRemainingMs ?? 15000,
     bonusStarted: Boolean(room.bonusStarted), bonusArmed: Boolean(room.bonusArmed),
     roundMode: room.roundMode || 'opening', obstacleStarted: Boolean(room.obstacleStarted), obstacleSelectedRow: room.obstacleSelectedRow || null, obstacleRowsSelected: [...(room.obstacleRowsSelected || [])], obstaclePictureOpen: Boolean(room.obstaclePictureOpen), obstaclePictureRevealed: [...(room.obstaclePictureRevealed || [])], obstaclePictureEverRevealed: [...(room.obstaclePictureEverRevealed || [])], obstacleBuzzOrder: room.obstacleBuzzOrder || [],
@@ -540,7 +541,7 @@ io.on('connection', socket => {
   });
   socket.on('host:round-mode', ({ round, speedSlot, openMedia = false } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    const allowedRounds = ['intro', 'opening', 'obstacle', 'speed', 'finish', 'bonus'];
+    const allowedRounds = ['intro', 'opening', 'obstacle', 'speed', 'finish', 'bonus', 'summary'];
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (!allowedRounds.includes(round)) return ack({ ok: false, error: 'Vòng thi không hợp lệ.' });
     if (typeof openMedia !== 'boolean') return ack({ ok: false, error: 'Trạng thái media không hợp lệ.' });
@@ -548,6 +549,12 @@ io.on('connection', socket => {
     if (round === 'speed' && speedSlot !== undefined && speedSlot !== null && (!Number.isInteger(speedSlot) || speedSlot < 0 || speedSlot >= room.speedQuestions.length)) return ack({ ok: false, error: 'Câu Tăng tốc không hợp lệ.' });
     if (openMedia && !Number.isInteger(speedSlot)) return ack({ ok: false, error: 'Hãy chọn câu Tăng tốc trước khi mở media.' });
     if (room.roundMode === 'bonus' && round !== 'bonus') { stopTimer(room); room.deadline = null; room.status = 'locked'; room.bonusStarted = false; room.bonusArmed = false; bonusAudio(room, false); }
+    room.summaryPresentation = round === 'summary' ? {
+      startedAt: Date.now() + 1000,
+      players: [...room.players.values()].map((player, joinOrder) => ({ name: player.name, score: player.score, joinOrder })).sort((a, b) => a.score - b.score || a.joinOrder - b.joinOrder)
+    } : null;
+    room.obstacleGreenScreenQuestion = false;
+    room.speedQuestionOpened = round === 'speed' && openMedia;
     room.roundMode = round;
     room.buzzes = [];
     room.winnerId = null;
@@ -598,6 +605,28 @@ io.on('connection', socket => {
     } else return ack({ ok: false, error: 'Lệnh không hợp lệ.' });
     ack({ ok: true });
   });
+  socket.on('host:green-screen:toggle', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Host access required.' });
+    room.greenScreen = !room.greenScreen;
+    emitRoom(room);
+    ack({ ok: true, enabled: room.greenScreen });
+  });
+  socket.on('host:overlay:play', ({ slot } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Host access required.' });
+    if (![5, 6, 7].includes(slot)) return ack({ ok: false, error: 'Invalid media slot.' });
+    const media = room.introMedia[slot];
+    if (!media) return ack({ ok: false, error: 'Chưa có media trong MediaDatabase.' });
+    io.to(`${room.code}:projector`).emit('projector:overlay:media', { name: media.name, type: media.type, data: media.data });
+    ack({ ok: true });
+  });
+  socket.on('host:overlay:close', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Host access required.' });
+    io.to(`${room.code}:projector`).emit('projector:overlay:close');
+    ack({ ok: true });
+  });
   socket.on('host:intro:play', ({ slot } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
@@ -622,6 +651,7 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (room.roundMode !== 'obstacle' || !Number.isInteger(row) || row < 1 || row > 5 || !['Đ', 'S'].includes(verdict)) return ack({ ok: false, error: 'Kết quả hàng ngang không hợp lệ.' });
+    if (verdict === 'S') { room.obstacleGreenScreenQuestion = false; emitRoom(room); }
     room.obstacleVerdicts[row] = verdict;
     io.to(`${room.code}:projector`).emit('projector:obstacle:verdict', { row, verdict });
     ack({ ok: true });
@@ -638,6 +668,7 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (room.roundMode !== 'obstacle') return ack({ ok: false, error: 'Hãy chọn phần thi Vượt chướng ngại vật trước.' });
+    room.obstacleGreenScreenQuestion = false;
     room.obstaclePictureOpen = !room.obstaclePictureOpen;
     emitRoom(room);
     ack({ ok: true });
@@ -646,6 +677,7 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (room.roundMode !== 'obstacle') return ack({ ok: false, error: 'Hãy chọn phần thi Vượt chướng ngại vật trước.' });
+    room.obstacleGreenScreenQuestion = false;
     room.obstacleStarted = true;
     room.obstaclePictureOpen = false;
     emitRoom(room);
@@ -928,7 +960,7 @@ io.on('connection', socket => {
       if (t.remainingMs <= 0) t.remainingMs = t.duration * 1000;
       t.running = true; t.startedAt ||= Date.now(); t.deadline = Date.now() + t.remainingMs;
       t.handle = setTimeout(() => { t.remainingMs = 0; t.running = false; t.deadline = null; t.handle = null; emitRoom(room); }, t.remainingMs);
-      if (room.roundMode === 'obstacle' && t.duration === 15) clearRoomAnswers(room);
+      if (room.roundMode === 'obstacle' && t.duration === 15) { room.obstacleGreenScreenQuestion = true; clearRoomAnswers(room); }
       else emitRoom(room);
     }
     ack({ ok: true });
@@ -966,6 +998,7 @@ io.on('connection', socket => {
   socket.on('host:answer:reveal', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (room.roundMode === 'obstacle') { room.obstacleGreenScreenQuestion = false; emitRoom(room); }
     const answers = [...room.players.values()]
       .filter(player => player.latestAnswer)
       .map(player => ({
