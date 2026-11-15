@@ -9,7 +9,7 @@
   <div class="topline host-topline"><div class="host-room-status"><div><div class="eyebrow">MÃ PHÒNG</div><div class="roomcode" id="hostCode">------</div></div><span id="hostStatus" class="status">ĐANG CHỜ</span></div><div class="host-top-actions"><button class="secondary" id="openProjector">MÁY CHIẾU</button><button class="secondary" id="copyLink">SAO CHÉP LINK</button><button class="secondary" id="openDatabase">DATABASE</button><button class="secondary" id="openMedia">MEDIADATABASE</button><div class="host-round-buttons" role="group" aria-label="Chọn vòng thi"><button class="secondary is-active" type="button" data-host-round="intro" aria-pressed="true">Intro</button><button class="secondary" type="button" data-host-round="opening" aria-pressed="false">Khởi động</button><button class="secondary" type="button" data-host-round="obstacle" aria-pressed="false">Vượt chướng ngại vật</button><button class="secondary" type="button" data-host-round="speed" aria-pressed="false">Tăng tốc</button><button class="secondary" type="button" data-host-round="finish" aria-pressed="false">Về đích</button><button class="secondary" type="button" data-host-round="bonus" aria-pressed="false">Câu hỏi phụ</button><button class="secondary" type="button" data-host-round="summary" aria-pressed="false">Tổng kết điểm</button></div></div></div>
   <div class="host-layout">
     <div class="host-question-row">
-      <textarea id="hostQuestionInput" class="question-display host-question" rows="2" maxlength="500" placeholder="NHẬP CÂU HỎI"></textarea>
+      <textarea id="hostQuestionInput" class="question-display host-question" rows="2" maxlength="1000" placeholder="NHẬP CÂU HỎI"></textarea>
       <textarea id="hostAnswerNote" class="host-answer-note" rows="2" maxlength="5000" placeholder="ĐÁP ÁN" aria-label="Đáp án, chỉ hiển thị trên máy Host"></textarea>
     </div>
     <div class="panel host-future-panel">
@@ -86,7 +86,7 @@
           <button class="secondary" id="endFinishRound" type="button">End</button><button class="secondary" id="finishTimer15" type="button">15s</button><button class="secondary" id="finishTimer20" type="button">20s</button><button class="secondary" id="finishTimer30" type="button">30s</button>
           <button class="secondary" id="finishNshv" type="button" aria-pressed="false">NSHV</button><button class="secondary" id="finishBlank" type="button">Blank (B)</button><button class="secondary" id="finishCorrect" type="button">Đúng (C)</button><button class="secondary" id="finishWrong" type="button">Sai (X)</button>
           <button class="secondary finish-question-nav" id="nextFinishQuestion" type="button" disabled>NextQs (→)</button><button class="secondary finish-question-nav" id="previousFinishQuestion" type="button" disabled>PrevQs (←)</button>
-          <button class="secondary" id="finishQuestionPointsDisplay" type="button">Câu ... điểm</button>
+          <button class="secondary" id="finishQuestionPointsDisplay" type="button">... điểm</button>
           <label class="finish-allow-option"><input id="finishAllowFortyQuestionFour" type="checkbox">Cho phép chọn câu 40 điểm và câu số 4</label>
         </div>
       </div>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" viewBox="0 0 96 48">
+<defs><linearGradient id="metal" x2="0" y2="1"><stop stop-color="#d8c49c"/><stop offset=".45" stop-color="#9d885e"/><stop offset="1" stop-color="#514533"/></linearGradient><linearGradient id="stone" x2="0" y2="1"><stop stop-color="#303038"/><stop offset=".5" stop-color="#14141c"/><stop offset="1" stop-color="#2b2932"/></linearGradient></defs>
+<path fill="url(#stone)" d="M0 0h96v48H0z"/>
+<g fill="none" stroke="url(#metal)" stroke-width="1.2">
+<path d="M0 3h96M0 45h96M0 7h96M0 41h96"/>
+<path d="M0 24Q12 22 24 9Q36 22 48 24Q60 22 72 9Q84 22 96 24M0 24Q12 26 24 39Q36 26 48 24Q60 26 72 39Q84 26 96 24"/>
+<path d="M24 9v30M72 9v30M15 24q9-18 18 0q-9 18-18 0ZM63 24q9-18 18 0q-9 18-18 0Z"/>
+<path d="M0 24q6-13 12 0q-6 13-12 0ZM42 24q6-13 12 0q-6 13-12 0ZM84 24q6-13 12 0q-6 13-12 0Z"/>
+</g><g fill="#c8b184"><path d="m24 17 3 7-3 7-3-7ZM72 17l3 7-3 7-3-7ZM48 21l3 3-3 3-3-3Z"/></g>
+</svg>

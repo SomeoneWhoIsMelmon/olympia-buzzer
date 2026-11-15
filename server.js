@@ -386,7 +386,7 @@ io.on('connection', socket => {
       for (const player of room.players.values()) player.buzzedAt = null;
       bonusAudio(room, false);
     }
-    room.question = String(question || '').trim().slice(0, 500);
+    room.question = String(question || '').trim().slice(0, 1000);
     room.obstacleSelectedRow = room.roundMode === 'obstacle' && Number.isInteger(obstacleRow) && obstacleRow >= 1 && obstacleRow <= 5 ? obstacleRow : null;
     if (room.roundMode === 'obstacle' && Number.isInteger(obstacleRow) && obstacleRow >= 1 && obstacleRow <= 5) room.obstacleRowsSelected.add(obstacleRow);
     room.openingQuestionRound = ''; room.openingQuestionIndex = null; room.openingQuestionMode = ''; room.openingEmptyQuestionNumber = null;
