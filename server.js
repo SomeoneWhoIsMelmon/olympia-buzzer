@@ -27,6 +27,7 @@ function publicRoom(room) {
     code: room.code, status: room.status, duration: room.duration, question: room.question || '',
     finishQuestionCount: room.finishQuestionSequence?.length || 0, finishQuestionPointsSequence: (room.finishQuestionSequence || []).map(question => question.points), finishAllowFortyQuestionFour: Boolean(room.finishAllowFortyQuestionFour), finishQuestionIndex: room.finishQuestionIndex,
     finishQuestionPoints: Number.isInteger(room.finishQuestionIndex) ? room.finishQuestionSequence?.[room.finishQuestionIndex]?.points ?? null : null,
+    finishQuestionTimer: room.finishQuestionTimer || null, openingQuestionTimer: room.openingQuestionTimer || null,
     finishPlayerId: room.finishPlayerId || null, finishNshv: Boolean(room.finishNshv), finishStealPending: Boolean(room.finishStealPending),
     projectorVolume: room.projectorVolume, greenScreen: Boolean(room.greenScreen), speedQuestionOpened: Boolean(room.speedQuestionOpened), obstacleGreenScreenQuestion: Boolean(room.obstacleGreenScreenQuestion),
     deadline: room.deadline, openingDeadline: room.openingDeadline || null, buzzerCountdownDeadline: room.buzzerCountdownDeadline || null, winnerCountdownDeadline: room.winnerCountdownDeadline || null, buzzerAlwaysOpen: room.buzzerAlwaysOpen, winnerId: room.winnerId, buzzes: room.buzzes || [],
@@ -36,6 +37,14 @@ function publicRoom(room) {
     summaryPresentation: room.summaryPresentation || null,
     bonusRemainingMs: room.bonusRemainingMs ?? 15000,
     bonusStarted: Boolean(room.bonusStarted), bonusArmed: Boolean(room.bonusArmed),
+    obstacleDisplayRows: room.roundMode === 'obstacle' ? room.obstacleCourse.rows.map((row,index)=>{
+      const verdict=room.obstacleVerdicts?.[index+1]||'';
+      const cells=Array.isArray(row.answerCells)?row.answerCells:obstacleAnswerCells(row.answer);
+      return {verdict,cells:Array.from({length:15},(_,cell)=>{
+        const character=String(cells[cell]||'');
+        return !character.trim()?'':verdict==='Đ'?character:'•';
+      })};
+    }) : [],
     roundMode: room.roundMode || 'opening', obstacleStarted: Boolean(room.obstacleStarted), obstacleSelectedRow: room.obstacleSelectedRow || null, obstacleRowsSelected: [...(room.obstacleRowsSelected || [])], obstaclePictureOpen: Boolean(room.obstaclePictureOpen), obstaclePictureRevealed: [...(room.obstaclePictureRevealed || [])], obstaclePictureEverRevealed: [...(room.obstaclePictureEverRevealed || [])], obstacleBuzzOrder: room.obstacleBuzzOrder || [],
     players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, team: p.team, score: p.score, connected: p.connected, focused: p.focused !== false, buzzedAt: p.buzzedAt, obstacleBuzzed: Boolean(p.obstacleBuzzed), obstacleBuzzUsed: Boolean(p.obstacleBuzzUsed), obstacleBuzzJudged: Boolean(p.obstacleBuzzJudged), answerSubmitted: Boolean(p.answerSubmitted), latestAnswer: p.latestAnswer || null })),
     teams: room.teams, answerCount: room.answers.length, independentTimer: { duration: room.independentTimer.duration, running: room.independentTimer.running, deadline: room.independentTimer.deadline, remainingMs: room.independentTimer.running && room.independentTimer.deadline ? Math.max(0, room.independentTimer.deadline - Date.now()) : room.independentTimer.remainingMs, startedAt: room.independentTimer.startedAt }
@@ -98,6 +107,8 @@ function emitActiveRoundMedia(room, target = room.code) {
 }
 function stopTimer(room) { if (room.timer) clearTimeout(room.timer); room.timer = null; }
 function stopOpeningTimer(room) {
+  room.finishQuestionTimer = null;
+  room.openingQuestionTimer = null;
   if (room.openingTimer) clearTimeout(room.openingTimer);
   room.openingTimer = null;
   room.openingDeadline = null;
@@ -114,6 +125,7 @@ function stopWinnerCountdown(room) {
   room.winnerCountdownDeadline = null;
 }
 function resetFinishBuzzer(room) {
+  stopOpeningTimer(room);
   stopTimer(room);
   stopBuzzerCountdown(room);
   stopWinnerCountdown(room);
@@ -378,6 +390,7 @@ io.on('connection', socket => {
   socket.on('host:question', ({ question, resetBuzzer, clearAnswers = false, obstacleRow } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (room.roundMode === 'obstacle' && Number.isInteger(obstacleRow) && room.obstaclePictureOpen) return ack({ ok: false, error: 'Hãy tắt Mở ảnh trước khi chọn hàng ngang.' });
     if (typeof clearAnswers !== 'boolean') return ack({ ok: false, error: 'Trạng thái xóa câu trả lời không hợp lệ.' });
     if (resetBuzzer) stopBuzzerCountdown(room);
     if (room.roundMode === 'bonus') {
@@ -650,16 +663,20 @@ io.on('connection', socket => {
   socket.on('host:obstacle:verdict', ({ row, verdict } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!room.obstacleStarted) return ack({ ok: false, error: 'Hãy nhấn Start để bắt đầu Vượt chướng ngại vật trước.' });
     if (room.roundMode !== 'obstacle' || !Number.isInteger(row) || row < 1 || row > 5 || !['Đ', 'S'].includes(verdict)) return ack({ ok: false, error: 'Kết quả hàng ngang không hợp lệ.' });
-    if (verdict === 'S') { room.obstacleGreenScreenQuestion = false; emitRoom(room); }
+    if (verdict === 'S') room.obstacleGreenScreenQuestion = false;
     room.obstacleVerdicts[row] = verdict;
+    emitRoom(room);
     io.to(`${room.code}:projector`).emit('projector:obstacle:verdict', { row, verdict });
     ack({ ok: true });
   });
   socket.on('host:obstacle:row-selected', ({ row } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!room.obstacleStarted) return ack({ ok: false, error: 'Hãy nhấn Start để bắt đầu Vượt chướng ngại vật trước.' });
     if (room.roundMode !== 'obstacle' || !Number.isInteger(row) || row < 1 || row > 5) return ack({ ok: false, error: 'Hàng ngang không hợp lệ.' });
+    if (room.obstaclePictureOpen) return ack({ ok: false, error: 'Hãy tắt Mở ảnh trước khi chọn hàng ngang.' });
     room.obstacleRowsSelected.add(row);
     io.to(`${room.code}:projector`).emit('projector:obstacle:question-presentation', { action: 'show' });
     ack({ ok: true });
@@ -667,6 +684,7 @@ io.on('connection', socket => {
   socket.on('host:obstacle:picture-open', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!room.obstacleStarted) return ack({ ok: false, error: 'Hãy nhấn Start để bắt đầu Vượt chướng ngại vật trước.' });
     if (room.roundMode !== 'obstacle') return ack({ ok: false, error: 'Hãy chọn phần thi Vượt chướng ngại vật trước.' });
     room.obstacleGreenScreenQuestion = false;
     room.obstaclePictureOpen = !room.obstaclePictureOpen;
@@ -686,7 +704,9 @@ io.on('connection', socket => {
   socket.on('host:obstacle:reveal', ({ tile, open, all } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (!room.obstacleStarted) return ack({ ok: false, error: 'Hãy nhấn Start để bắt đầu Vượt chướng ngại vật trước.' });
     if (room.roundMode !== 'obstacle') return ack({ ok: false, error: 'Hãy chọn phần thi Vượt chướng ngại vật trước.' });
+    if (!room.obstaclePictureOpen) return ack({ ok: false, error: 'Hãy bật Mở ảnh trước khi mở mảnh ghép.' });
     if (all === true) {
       openAllObstacle(room);
     } else {
@@ -777,6 +797,7 @@ io.on('connection', socket => {
       const deadline = Date.now() + 60000;
       room.openingDeadline = deadline;
       room.openingTimerKind = 'round';
+      room.openingQuestionTimer = { duration: 60, deadline };
       room.openingTimer = setTimeout(() => {
         if (room.openingDeadline === deadline && room.openingQuestionRound === selectedRound) {
           room.openingDeadline = null;
@@ -984,6 +1005,7 @@ io.on('connection', socket => {
     const deadline = Date.now() + seconds * 1000;
     room.openingDeadline = deadline;
     room.openingTimerKind = 'finish';
+    room.finishQuestionTimer = { duration: seconds, deadline };
     room.openingTimer = setTimeout(() => {
       if (room.openingDeadline !== deadline || room.openingTimerKind !== 'finish') return;
       room.openingDeadline = null;
@@ -1054,6 +1076,7 @@ io.on('connection', socket => {
     if (room.roundMode === 'obstacle' && Number.isInteger(obstacleRow) && obstacleRow >= 1 && obstacleRow <= 4) {
       obstacleVerdict = correctIds.size > 0 ? 'Đ' : 'S';
       room.obstacleVerdicts[obstacleRow] = obstacleVerdict;
+      emitRoom(room);
       io.to(`${room.code}:projector`).emit('projector:obstacle:verdict', { row: obstacleRow, verdict: obstacleVerdict });
     }
     ack({ ok: true, grades, correctCount: grades.filter(grade => grade.correct).length, obstacleRow: obstacleVerdict ? obstacleRow : null, obstacleVerdict });
@@ -1202,7 +1225,15 @@ io.on('connection', socket => {
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     const deleted = room.questions.length;
     room.questions = [];
+    room.speedQuestions = Array.from({length:4},(_,index)=>({...room.speedQuestions[index],prompt:'',answer:''}));
+    room.obstacleCourse = {...room.obstacleCourse,
+      rows:Array.from({length:4},()=>({answer:'',answerCells:Array(15).fill(''),question:''})),
+      keyword:'',keywordQuestion:'',fullAnswer:''};
+    room.finishRounds = Array.from({length:4},()=>Array.from({length:7},()=>({question:'',answer:''})));
     emitHostDatabaseQuestions(room);
+    emitHostSpeedQuestions(room);
+    emitProjectorObstacleAnswers(room);
+    emitRoom(room);
     ack({ ok: true, questions: room.questions, deleted });
   });
   socket.on('host:database:import', ({ questions } = {}, ack = () => {}) => {

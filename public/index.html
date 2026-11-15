@@ -100,6 +100,7 @@
           </div>
         </div>
         <div class="host-obstacle-control-columns">
+          <div id="hostObstacleCnvLabel" class="host-obstacle-cnv-label">CNV có 0 ký tự (—)</div>
           <div class="host-obstacle-control-group">
             <h2>HN</h2>
             <div class="host-obstacle-number-list">
@@ -172,7 +173,6 @@
     <label class="database-file-label">Nhập workbook Excel (.xlsx)<input id="databaseFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
     <button class="primary" id="importWorkbook" type="button">NHẬP ĐỀ</button>
     <button class="secondary" id="clearDatabase" type="button" disabled>XÓA TOÀN BỘ</button>
-    <span id="databaseCount" class="muted" aria-live="polite">0 câu hỏi</span>
   </div>
   <p class="database-import-note">Sheet “Khởi động” đọc câu hỏi ở cột C và đáp án tương ứng ở cột D vào 5 bảng Khởi Động; mỗi lần nhập sẽ thay thế câu hỏi hiện có trong 5 bảng. Sheet “Về đích” đọc C4:C10, C12:C18, C20:C26, C28:C34 cùng đáp án tương ứng ở cột D vào 4 bảng Về đích. Các nút chọn lượt, bắt đầu, chuyển câu và chấm đáp án sử dụng trực tiếp những câu hỏi Khởi Động này. Câu hỏi Tăng tốc được đọc từ B3:B6 và đáp án từ C3:C6 trong sheet “Tăng tốc B”; bảng Vượt chướng ngại vật đọc từ sheet “VCNV”.</p>
   <div id="speedQuestionSlots" class="database-speed-grid" aria-label="Câu hỏi Tăng tốc">
@@ -240,7 +240,7 @@
     <div id="projectorObstacleBuzzes" class="projector-obstacle-buzzes hidden" aria-label="Thứ tự thí sinh bấm chuông"></div>
     <div id="projectorObstaclePicture" class="projector-obstacle-picture hidden" aria-hidden="true"></div>
     <div id="projectorObstacleRows" class="projector-obstacle-rows" aria-hidden="true"></div>
-    <section class="projector-obstacle-question-box"><div id="projectorObstacleQuestion" class="projector-obstacle-question"></div><div id="projectorObstacleQuestionTimerBox" class="projector-obstacle-question-timer-box hidden" aria-hidden="true"><span id="projectorObstacleQuestionTimer" class="projector-question-timer"></span></div></section>
+    <section class="projector-obstacle-question-box"><div id="projectorObstacleQuestion" class="projector-obstacle-question"></div><div id="projectorObstacleProgress" class="projector-finish-progress hidden" aria-hidden="true"><div class="projector-finish-progress-fill"></div></div><div id="projectorObstacleQuestionTimerBox" class="projector-obstacle-question-timer-box hidden" aria-hidden="true"><span id="projectorObstacleQuestionTimer" class="projector-question-timer"></span></div></section>
   </div>
   <div id="projectorFinishStartGraphic" class="projector-finish-start-graphic hidden" aria-label="Mức điểm câu hỏi Về đích">
     <div class="projector-finish-point-row"><div class="projector-finish-question-markers"><span data-finish-points="20" data-finish-question="1"></span><span data-finish-points="20" data-finish-question="2"></span><span data-finish-points="20" data-finish-question="3"></span></div><div class="projector-finish-point-tile" data-finish-point-tile="20">20</div></div>
@@ -249,11 +249,11 @@
   </div>
   <div class="projector-stage">
     <div class="projector-summary" role="group" aria-label="Tổng kết điểm"><div class="projector-summary-name"></div><div class="projector-summary-score"></div></div>
-    <div class="projector-question-stack"><section class="projector-question-panel"><div id="projectorQuestion" class="projector-question"></div><div id="projectorQuestionTimerBox" class="projector-question-timer-box hidden" aria-hidden="true"><span id="projectorQuestionTimer" class="projector-question-timer"></span></div></section><div id="projectorFinishQuestionPoints" class="projector-finish-question-points hidden" aria-live="polite"></div></div>
+    <div class="projector-question-stack"><section class="projector-question-panel"><div id="projectorQuestion" class="projector-question"></div><div id="projectorFinishProgress" class="projector-finish-progress hidden" aria-hidden="true"><div class="projector-finish-progress-fill"></div></div><div id="projectorQuestionTimerBox" class="projector-question-timer-box hidden" aria-hidden="true"><span id="projectorQuestionTimer" class="projector-question-timer"></span></div></section><div id="projectorFinishQuestionPoints" class="projector-finish-question-points hidden" aria-live="polite"></div></div>
     <section class="projector-score-panel"><div id="projectorScoreboard" class="projector-scoreboard"></div></section>
   </div>
   <div class="projector-player-layout">
-    <div class="question-display" id="projectorPlayerQuestion"><span id="projectorPlayerQuestionText" class="question-display-text"></span><div class="projector-speed-media-area"><div id="projectorPlayerQuestionMedia" class="question-display-media hidden"></div><div id="projectorSpeedQuestionTimerBox" class="projector-speed-question-timer-box hidden" aria-hidden="true"><span id="projectorSpeedQuestionTimer" class="projector-question-timer"></span></div></div></div>
+    <div class="question-display" id="projectorPlayerQuestion"><span id="projectorPlayerQuestionText" class="question-display-text"></span><div class="projector-speed-media-area"><div id="projectorPlayerQuestionMedia" class="question-display-media hidden"></div><div id="projectorSpeedProgress" class="projector-finish-progress hidden" aria-hidden="true"><div class="projector-finish-progress-fill"></div></div><div id="projectorSpeedQuestionTimerBox" class="projector-speed-question-timer-box hidden" aria-hidden="true"><span id="projectorSpeedQuestionTimer" class="projector-question-timer"></span></div></div></div>
     <div class="projector-score-stack">
       <div class="panel player-score-panel"><h2>Bảng điểm</h2><div id="projectorPlayerScoreboard" class="players"></div></div>
       <div class="player-answer-clock projector-answer-clock"><span>THỜI GIAN TRẢ LỜI</span><strong id="projectorIndependentDisplay">01:00</strong></div>
@@ -262,20 +262,22 @@
 </section>
 <section id="playerView" class="hidden player-page">
   <div class="topline player-topline"><div><div class="eyebrow">PHÒNG</div><div class="roomcode" id="playerRoomCode">------</div></div><div class="teamtag" id="myTeam"></div></div>
-  <div class="panel playpanel player-layout">
+  <div class="panel playpanel player-layout scoreboard-hidden player-details-hidden">
     <div class="player-statusline"><span id="playerStatus" class="status">ĐANG CHỜ</span><span id="playerTimer" class="timer">--</span></div>
-    <div class="question-display" id="questionDisplay"><span id="questionDisplayText" class="question-display-text"></span><div id="questionDisplayMedia" class="question-display-media hidden"></div></div>
-    <div class="panel player-score-panel"><h2>Bảng điểm</h2><div id="playerScoreboard" class="players"></div></div>
+    <div class="question-display" id="questionDisplay"><div id="playerObstacleBoard" class="player-obstacle-board hidden"><div class="player-obstacle-picture-slot"><div id="playerObstaclePicture" class="projector-obstacle-picture player-obstacle-picture"></div></div><div id="playerObstacleRows" class="projector-obstacle-rows player-obstacle-rows"></div></div><div id="playerQuestionTextArea" class="player-question-text-area"><span id="questionDisplayText" class="question-display-text"></span></div><div id="questionDisplayMedia" class="question-display-media hidden"></div></div>
+    <div class="panel player-score-panel hidden" id="playerScorePanel"><h2>Bảng điểm</h2><div id="playerScoreboard" class="players"></div></div>
     <form id="answerForm" class="answer-entry">
       <textarea id="answerInput" rows="1" maxlength="500" placeholder="NHẬP ĐÁP ÁN" disabled></textarea>
       <button class="primary answer-send" id="submitAnswer" type="submit" disabled>GỬI ĐÁP ÁN</button>
     </form>
+    <div class="player-bottom-controls">
     <div class="last-answer"><div class="muted">CÂU TRẢ LỜI GẦN NHẤT</div><p id="lastAnswerText">Chưa gửi câu trả lời nào.</p><small id="lastAnswerTime" class="muted"></small></div>
     <button id="buzzButton" class="buzz player-buzz" disabled><span>BẤM CHUÔNG</span></button>
     <div class="player-answer-clock"><span>THỜI GIAN TRẢ LỜI</span><strong id="playerIndependentDisplay">01:00</strong></div>
+    </div>
     <div id="playerMessage" class="muted center">Chờ Host mở chuông…</div>
     <p id="answerMessage" class="muted player-answer-message" aria-live="polite">Chờ Host mở lượt...</p>
-    <div class="scorebox">Điểm của bạn: <strong id="myScore">0</strong></div>
+    <div class="scorebox">Điểm của bạn: <strong id="myScore">0</strong> <button id="togglePlayerScoreboard" class="secondary player-score-toggle" type="button" aria-controls="playerScorePanel" aria-expanded="false">Hiện bảng điểm và Câu trả lời gần nhất</button> <button id="togglePlayerFullscreen" class="secondary player-score-toggle" type="button" aria-pressed="false">Bật toàn màn hình</button></div>
   </div>
 </section>
 <dialog id="answerRevealDialog" class="answer-reveal-dialog" aria-labelledby="answerRevealTitle">

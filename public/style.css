@@ -51,7 +51,7 @@ body.player-active header,body.player-active footer{display:none;}
 .player-active .player-topline .eyebrow{display:none;}
 .player-active .player-topline .roomcode{font-size:14px;letter-spacing:1px;color:#fff;margin:0;}
 .player-active .player-topline .teamtag{background:none;color:#fff;padding:0;}
-.player-active .player-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(250px,1fr);grid-template-areas:"status status" "question score" "answer recent" "buzzer answer-clock" "my-score my-score";align-items:stretch;gap:clamp(8px,2vh,20px);width:100%;max-width:none;margin:0;padding:0;background:none;border:0;border-radius:0;box-shadow:none;text-align:center;}
+.player-active .player-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(250px,1fr);grid-template-areas:"status status" "question score" "answer answer" "bottom-controls bottom-controls" "my-score my-score";align-items:stretch;gap:clamp(8px,2vh,20px);width:100%;max-width:none;margin:0;padding:0;background:none;border:0;border-radius:0;box-shadow:none;text-align:center;}
 .player-active .player-statusline{grid-area:status;}
 .player-active .question-display{grid-area:question;height:clamp(260px,64vh,480px);min-height:0;border:4px solid #fff;background:#004d99;color:#fff;}
 .player-active .question-display-text{display:block;width:100%;max-width:100%;max-height:100%;min-height:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;}
@@ -85,7 +85,7 @@ body.player-active header,body.player-active footer{display:none;}
 .player-active .scorebox strong{color:#fff;}
 @media(max-width:650px){
  .player-active .shell{padding:8px;}
- .player-active .player-layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"status" "question" "score" "answer" "recent" "buzzer" "answer-clock" "my-score";gap:10px;}
+ .player-active .player-layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"status" "question" "score" "answer" "bottom-controls" "my-score";gap:10px;}
  .player-active .question-display{height:clamp(200px,38vh,340px);}
  .player-active .player-score-panel{height:auto;max-height:360px;min-height:160px;padding:12px;}
  .player-active .player-score-panel .players{gap:6px;}
@@ -259,7 +259,7 @@ body,body.player-active{background:#000040;}
 .host-active #hostAnswers .answercard-incorrect{border-left-color:#e00000;}
 .host-active #hostAnswers .answer-grade-status.correct{color:#19b978;}
 .host-active #hostAnswers .answer-grade-status.incorrect{color:#ff5364;}
-.projector-active .revealed-answer.incorrect{background:#000;}
+.projector-active .revealed-answer.incorrect{background:transparent;}
 @media(max-width:650px){
  .host-active,.host-active .shell{height:auto;min-height:100vh;overflow:visible;}
  .host-active .host-page{min-height:0;}
@@ -717,3 +717,78 @@ body,body.player-active{background:#000040;}
 
 /* Give projector questions more vertical room while retaining the side inset. */
 .projector-question-panel{padding-top:18px;padding-bottom:15px;}
+
+/* Finish round: a thin elapsed-time bar along the question panel bottom edge. */
+.projector-finish-progress{position:absolute;left:0;right:0;bottom:3px;height:6px;overflow:visible;pointer-events:none;z-index:2;}
+.projector-finish-progress-fill{position:relative;width:0;min-width:10px;height:100%;background:#f01823;}
+.projector-finish-progress-fill::after{content:"";position:absolute;right:0;top:50%;width:10px;height:10px;border-radius:50%;background:#f01823;transform:translateY(-50%);}
+
+.projector-finish-progress-fill::after{animation:finish-progress-pulse 2s ease-in-out infinite;}
+.projector-finish-progress.is-complete .projector-finish-progress-fill::after{display:none;}
+.projector-finish-progress.is-complete{animation:question-progress-fade-out .3s ease-out forwards;}
+@keyframes question-progress-fade-out{from{opacity:1;visibility:visible;}to{opacity:0;visibility:hidden;}}
+@keyframes finish-progress-pulse{0%,100%{transform:translateY(-50%) scale(1);opacity:1;}50%{transform:translateY(-50%) scale(2);opacity:1;}}
+
+/* Let the pulsing timer dot extend beyond the panel; question text clips itself. */
+.projector-question-panel:has(.projector-finish-progress:not(.hidden)){overflow:visible;}
+
+.projector-finish-progress.is-paused .projector-finish-progress-fill::after{animation-play-state:paused;}
+
+.projector-speed-media-area>.projector-finish-progress{z-index:4;}
+
+/* Projector answer board: four separate rows over the existing background. */
+.projector-answer-reveal #projectorView>*{visibility:hidden!important;}
+.projector-answer-reveal #projectorVideoOverlay::backdrop{background:transparent;}
+.projector-active .answer-reveal-dialog{width:min(80vw,1250px);height:86vh;max-height:none;margin:auto;padding:0;border:0;outline:0;background:transparent;overflow:visible;box-shadow:none;transform:scale(.9);transform-origin:center;}
+.projector-active .answer-reveal-dialog::backdrop{background:transparent;}
+.projector-active .answer-reveal-content{height:100%;max-height:none;padding:0;}
+.projector-active .answer-reveal-content h2{display:none;}
+.projector-active .revealed-answers{height:100%;grid-template-rows:repeat(var(--answer-count,4),minmax(0,1fr));gap:clamp(12px,2.2vh,26px);overflow:visible;}
+.projector-active .revealed-answer{display:grid;grid-template-rows:30% minmax(0,1fr);min-height:0;padding:0;border:0;background:transparent;}
+.projector-active .revealed-answer-name{position:relative;z-index:0;display:flex;align-items:center;justify-content:center;width:24%;min-width:100px;max-width:260px;min-height:0;margin-left:2px;padding:2px 8px;border:0;border-radius:6px;background:#e6b800;color:#000040;font-size:clamp(16px,2.1vw,30px);font-weight:700!important;overflow:hidden;white-space:nowrap;animation:projector-answer-name-rise 1s cubic-bezier(0,0,.2,1) 1.5s both;}
+.projector-active .revealed-answer-body{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;gap:clamp(12px,2vw,32px);min-height:0;padding:clamp(8px,1.3vh,16px) clamp(12px,1.5vw,24px);border:3px solid #fff;background:#000040;color:#fff;}
+.projector-active .revealed-answer-text{align-self:center;max-height:100%;min-width:0;margin:0;font-size:clamp(26px,3.12vw,50px);font-weight:700!important;text-transform:uppercase;white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;}
+.projector-active .revealed-answer-time{align-self:center;min-width:5ch;text-align:right;font-size:clamp(26px,3.12vw,50px);font-weight:700!important;font-variant-numeric:tabular-nums;}
+.projector-active .revealed-answer.incorrect .revealed-answer-body{background:#4f0000;color:#fff;}
+@media(max-width:650px){.projector-active .answer-reveal-dialog{width:94vw;}.projector-active .revealed-answer-name{min-width:80px;width:35%;}}
+
+/* Reveal answers from top to bottom, with a soft landing for each row. */
+.projector-active .revealed-answer{animation:projector-answer-rise .8s cubic-bezier(0,0,.2,1) both;animation-delay:calc(var(--answer-index,0) * .2s);}
+@keyframes projector-answer-rise{from{transform:translateY(110vh);}to{transform:translateY(0);}}
+
+@keyframes projector-answer-name-rise{from{transform:translateY(calc(100% + 3px));}to{transform:translateY(0);}}
+
+.player-active .scorebox{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;}
+.player-active .player-score-toggle{padding:8px 12px;border:1px solid #fff;border-radius:6px;background:#000040;color:#fff;font-size:14px;}
+.player-active .player-layout.scoreboard-hidden{grid-template-areas:"status status" "question question" "answer answer" "bottom-controls bottom-controls" "my-score my-score";}
+@media(max-width:650px){.player-active .player-layout.scoreboard-hidden{grid-template-areas:"status" "question" "answer" "bottom-controls" "my-score";}}
+
+.player-active .player-bottom-controls{grid-area:bottom-controls;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"recent buzzer answer-clock";align-items:stretch;gap:clamp(8px,2vh,20px);min-width:0;}
+.player-active .player-bottom-controls .player-buzz{width:min(100%,420px);justify-self:center;}
+@media(max-width:650px){.player-active .player-bottom-controls{grid-template-columns:minmax(0,1fr);grid-template-areas:"recent" "buzzer" "answer-clock";}}
+
+.player-active .player-layout.player-details-hidden .player-bottom-controls>.last-answer,.player-active .player-layout.player-details-hidden .player-bottom-controls>.player-answer-clock{display:none;}
+.player-active .player-layout.player-details-hidden .player-bottom-controls{grid-template-columns:minmax(0,1fr);grid-template-areas:"buzzer";}
+
+/* Contestants see both obstacle panels above their question. */
+.player-question-text-area{display:contents;}
+.player-active .question-display.player-obstacle-active{display:grid;grid-template-rows:minmax(0,3fr) minmax(0,1fr);align-items:stretch;justify-content:stretch;padding:0;}
+.player-obstacle-board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0;min-height:0;border-bottom:3px solid #fff;}
+.player-obstacle-picture-slot{display:grid;place-items:center;min-width:0;min-height:0;border-right:3px solid #fff;container-type:size;overflow:hidden;}
+.player-obstacle-picture.projector-obstacle-picture{--frame-width:clamp(4px,1.5cqw,10px);position:relative;top:auto;left:auto;width:min(calc(100cqw - 40px),calc((100cqh - 40px) * 16 / 9));transform:none;}
+.player-obstacle-picture.projector-obstacle-picture::before{background-size:180px 180px;}
+.player-obstacle-picture.projector-obstacle-picture::after{inset:calc(-1 * var(--frame-width) - 4px);}
+.player-obstacle-picture .obstacle-mask-label{font-size:clamp(10px,5cqw,24px);}
+.player-obstacle-picture .projector-obstacle-outline path{stroke-width:2px;}
+.player-obstacle-rows.projector-obstacle-rows{padding:8px;gap:6px;container-type:inline-size;}
+.player-obstacle-rows .projector-obstacle-row{gap:2px;}
+.player-obstacle-rows .projector-obstacle-circle{border-width:1px;font-size:clamp(6px,3cqw,18px);font-weight:700!important;}
+.player-active .player-obstacle-active .player-question-text-area{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;padding:clamp(8px,1.4vw,18px);overflow:hidden;}
+
+/* Contestant obstacle image has no decorative picture frame. */
+.player-obstacle-picture.projector-obstacle-picture::before,.player-obstacle-picture.projector-obstacle-picture::after{display:none;}
+
+.host-obstacle-control-columns{grid-template-rows:auto minmax(0,1fr);}
+.host-obstacle-cnv-label{grid-column:1 / -1;min-width:0;text-align:center;font-size:clamp(10px,1.2vw,18px);line-height:1.2;color:#fff;white-space:nowrap;overflow:hidden;font-weight:700!important;}
+.host-obstacle-control-group{grid-template-rows:minmax(0,1fr);}
+.host-obstacle-control-group h2{display:none;}
