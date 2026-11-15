@@ -792,3 +792,7 @@ body,body.player-active{background:#000040;}
 .host-obstacle-cnv-label{grid-column:1 / -1;min-width:0;text-align:center;font-size:clamp(10px,1.2vw,18px);line-height:1.2;color:#fff;white-space:nowrap;overflow:hidden;font-weight:700!important;}
 .host-obstacle-control-group{grid-template-rows:minmax(0,1fr);}
 .host-obstacle-control-group h2{display:none;}
+
+/* Mirrored NSHV: final star center (86,235) in a 149x400 image anchors to the corner. */
+.projector-finish-star{position:absolute;left:100%;top:0;width:clamp(101.25px,10.8vw,162px);aspect-ratio:149 / 400;transform:translate(-57.71812%,-58.75%) scaleX(-1);z-index:5;pointer-events:none;}
+.projector-finish-star img{display:block;width:100%;height:100%;object-fit:contain;}

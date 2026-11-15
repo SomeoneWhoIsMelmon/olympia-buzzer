@@ -562,6 +562,16 @@ io.on('connection', socket => {
     if (round === 'speed' && speedSlot !== undefined && speedSlot !== null && (!Number.isInteger(speedSlot) || speedSlot < 0 || speedSlot >= room.speedQuestions.length)) return ack({ ok: false, error: 'Câu Tăng tốc không hợp lệ.' });
     if (openMedia && !Number.isInteger(speedSlot)) return ack({ ok: false, error: 'Hãy chọn câu Tăng tốc trước khi mở media.' });
     if (room.roundMode === 'bonus' && round !== 'bonus') { stopTimer(room); room.deadline = null; room.status = 'locked'; room.bonusStarted = false; room.bonusArmed = false; bonusAudio(room, false); }
+    room.question = '';
+    room.openingQuestionRound = '';
+    room.openingQuestionIndex = null;
+    room.openingQuestionMode = '';
+    room.openingStartArmed = false;
+    room.finishQuestionIndex = null;
+    room.finishNshv = false;
+    room.obstacleSelectedRow = null;
+    stopOpeningTimer(room);
+    io.to(room.code).emit('projector:answer:hide');
     room.summaryPresentation = round === 'summary' ? {
       startedAt: Date.now() + 1000,
       players: [...room.players.values()].map((player, joinOrder) => ({ name: player.name, score: player.score, joinOrder })).sort((a, b) => a.score - b.score || a.joinOrder - b.joinOrder)
