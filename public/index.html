@@ -46,7 +46,8 @@
           <div class="opening-selection-fields">
             <label>Lượt thi<select id="spotlightRound" aria-label="Chọn lượt thi Khởi động"><option value="">Chọn lượt thi…</option></select></label>
             <label>Thí sinh được chọn<select id="spotlightPlayer" aria-label="Chọn thí sinh để tô đỏ"><option value="">Không chọn thí sinh</option></select></label>
-            <label class="streak-option"><input id="openingStreakBonus" type="checkbox"> +20 nếu đúng 5 lần liên tiếp</label>
+            <label class="opening-option"><input id="openingStreakBonus" type="checkbox"> +20 nếu đúng 5 lần liên tiếp</label>
+            <label class="opening-option"><input id="openingScoreFloor" type="checkbox"> Không cho phép lùi quá ngưỡng 0</label>
           </div>
         </div>
         <div class="opening-question-controls">
@@ -249,8 +250,14 @@
   </div>
   <div class="projector-stage">
     <div class="projector-summary" role="group" aria-label="Tổng kết điểm"><div class="projector-summary-name"></div><div class="projector-summary-score"></div></div>
-    <div class="projector-question-stack"><div id="projectorFinishStar" class="projector-finish-star hidden" aria-hidden="true"></div><section class="projector-question-panel"><div id="projectorQuestion" class="projector-question"></div><div id="projectorFinishProgress" class="projector-finish-progress hidden" aria-hidden="true"><div class="projector-finish-progress-fill"></div></div><div id="projectorQuestionTimerBox" class="projector-question-timer-box hidden" aria-hidden="true"><span id="projectorQuestionTimer" class="projector-question-timer"></span></div></section><div id="projectorFinishQuestionPoints" class="projector-finish-question-points hidden" aria-live="polite"></div></div>
-    <section class="projector-score-panel"><div id="projectorScoreboard" class="projector-scoreboard"></div></section>
+    <div class="projector-question-stack"><div id="projectorFinishStar" class="projector-finish-star hidden" aria-hidden="true"></div><div id="projectorHorizontalScores" class="projector-horizontal-scores hidden" role="group" aria-label="Bảng điểm"></div><section class="projector-question-panel"><div id="projectorQuestion" class="projector-question"></div><div id="projectorFinishProgress" class="projector-finish-progress hidden" aria-hidden="true"><div class="projector-finish-progress-fill"></div></div><div id="projectorQuestionTimerBox" class="projector-question-timer-box hidden" aria-hidden="true"><span id="projectorQuestionTimer" class="projector-question-timer"></span></div></section></div>
+    <section class="projector-score-panel">
+      <div id="projectorScoreboard" class="projector-scoreboard"></div>
+      <div id="projectorScoreDetail" class="projector-score-detail hidden">
+        <div id="projectorScoreDetailLabel" class="projector-score-detail-label"></div>
+        <div id="projectorScoreDetailPoints" class="projector-score-detail-points"></div>
+      </div>
+    </section>
   </div>
   <div class="projector-player-layout">
     <div class="question-display" id="projectorPlayerQuestion"><span id="projectorPlayerQuestionText" class="question-display-text"></span><div class="projector-speed-media-area"><div id="projectorPlayerQuestionMedia" class="question-display-media hidden"></div><div id="projectorSpeedProgress" class="projector-finish-progress hidden" aria-hidden="true"><div class="projector-finish-progress-fill"></div></div><div id="projectorSpeedQuestionTimerBox" class="projector-speed-question-timer-box hidden" aria-hidden="true"><span id="projectorSpeedQuestionTimer" class="projector-question-timer"></span></div></div></div>

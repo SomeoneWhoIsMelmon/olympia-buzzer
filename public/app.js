@@ -25,7 +25,21 @@ async function loadProjectorAudio(type){if(projectorAudioBuffers.has(type))retur
 function playNextProjectorAudio(){if(role!=='projector'||!projectorAudioReady||!projectorAudioQueue.length)return;const type=projectorAudioQueue[0],buffer=projectorAudioBuffers.get(type);if(!buffer)return;const context=audioCtx;if(context.state!=='running'){if(!projectorAudioResumePending){projectorAudioResumePending=true;context.resume().then(()=>{projectorAudioResumePending=false;playNextProjectorAudio();}).catch(error=>{projectorAudioResumePending=false;toast(`Không thể tiếp tục phát âm thanh: ${error.message}`);});}return;}projectorAudioQueue.shift();const source=context.createBufferSource();source.buffer=buffer;source.connect(getProjectorOutput());projectorActiveAudioSources.add(source);source.onended=()=>{projectorActiveAudioSources.delete(source);playNextProjectorAudio();};source.start();}
 function stopAllProjectorSfx(){if(role!=='projector')return;clearProjectorSummary();stopBonusAudio();projectorAudioQueue=[];projectorAudioGeneration++;projectorOpeningMusicGeneration++;const sources=[...projectorActiveAudioSources];projectorActiveAudioSources.clear();for(const source of sources){try{source.stop();}catch{}source.disconnect();}if(projectorOpeningMusicSource){const music=projectorOpeningMusicSource;projectorOpeningMusicSource=null;try{music.stop();}catch{}music.disconnect();}}
 function clearProjectorOpeningAnimationTimeout(){if(projectorOpeningAnimationTimeout){clearTimeout(projectorOpeningAnimationTimeout);projectorOpeningAnimationTimeout=null;}}
-function startProjectorOpeningEntrance(){if(role!=='projector')return;const view=$('projectorView'),question=view.querySelector('.projector-question-panel'),score=view.querySelector('.projector-score-panel');clearProjectorOpeningAnimationTimeout();view.classList.remove('projector-opening-exiting','projector-opening-entering');view.classList.add('projector-opening-hidden');void view.offsetWidth;projectorOpeningAnimationTimeout=setTimeout(()=>{projectorOpeningAnimationTimeout=null;if(role!=='projector'||latest?.roundMode!=='opening')return;view.classList.remove('projector-opening-hidden');void question.offsetWidth;void score.offsetWidth;view.classList.add('projector-opening-entering');projectorOpeningAnimationTimeout=setTimeout(()=>{view.classList.remove('projector-opening-entering');projectorOpeningAnimationTimeout=null;},800);},4000);}
+function startProjectorOpeningEntrance(){
+ if(role!=='projector')return;
+ const view=$('projectorView');
+ clearProjectorOpeningAnimationTimeout();
+ view.classList.remove('projector-opening-exiting','projector-opening-entering');
+ view.classList.add('projector-opening-hidden');
+ void view.offsetWidth;
+ projectorOpeningAnimationTimeout=setTimeout(()=>{
+  projectorOpeningAnimationTimeout=null;
+  if(role!=='projector'||latest?.roundMode!=='opening')return;
+  view.classList.remove('projector-opening-hidden');
+  void view.offsetWidth;
+  view.classList.add('projector-opening-entering');
+ },4000);
+}
 function startProjectorOpeningExit(){if(role!=='projector')return;const view=$('projectorView'),wasHidden=view.classList.contains('projector-opening-hidden');clearProjectorOpeningAnimationTimeout();view.classList.remove('projector-opening-entering');if(wasHidden){view.classList.add('projector-opening-hidden');view.classList.remove('projector-opening-exiting');return;}view.classList.remove('projector-opening-exiting');void view.offsetWidth;view.classList.add('projector-opening-exiting');projectorOpeningAnimationTimeout=setTimeout(()=>{view.classList.remove('projector-opening-exiting');view.classList.add('projector-opening-hidden');projectorOpeningAnimationTimeout=null;},1800);}
 function clearProjectorFinishAnimationTimeout(){if(projectorFinishAnimationTimeout){clearTimeout(projectorFinishAnimationTimeout);projectorFinishAnimationTimeout=null;}}
 function clearProjectorObstacleQuestionTimeout(){if(projectorObstacleQuestionTimeout){clearTimeout(projectorObstacleQuestionTimeout);projectorObstacleQuestionTimeout=null;}}
@@ -37,11 +51,17 @@ function syncProjectorSpeedQuestionPresentation(state,previous){const view=$('pr
 function animateProjectorSpeedQuestion(){if(role!=='projector'||latest?.roundMode!=='speed'||!projectorSpeedMediaReady)return;const view=$('projectorView'),question=$('projectorPlayerQuestionText'),media=$('projectorPlayerQuestionMedia').parentElement;clearProjectorSpeedQuestionTimeout();view.classList.remove('projector-speed-question-entering');view.classList.add('projector-speed-question-hidden');void question.offsetWidth;void media.offsetWidth;view.classList.remove('projector-speed-question-hidden','projector-speed-media-pending');view.classList.add('projector-speed-question-entering');projectorSpeedQuestionTimeout=setTimeout(()=>{view.classList.remove('projector-speed-question-entering');projectorSpeedQuestionTimeout=null;},800);}
 function showProjectorSpeedQuestion(){if(role!=='projector'||latest?.roundMode!=='speed')return;projectorSpeedQuestionRequested=true;if(!projectorSpeedMediaReady){$('projectorView').classList.add('projector-speed-question-hidden','projector-speed-media-pending');return;}animateProjectorSpeedQuestion();}
 function markProjectorSpeedMediaReady(element){if(role!=='projector'||latest?.roundMode!=='speed'||$('projectorPlayerQuestionMedia').firstElementChild!==element)return;projectorSpeedMediaReady=true;$('projectorView').classList.remove('projector-speed-media-pending');if(projectorSpeedQuestionRequested)animateProjectorSpeedQuestion();}
-function startProjectorFinishEntrance(){if(role!=='projector')return;const view=$('projectorView');clearProjectorFinishAnimationTimeout();view.classList.remove('projector-finish-exiting','projector-finish-entering');view.classList.add('projector-finish-hidden');void view.offsetWidth;view.classList.add('projector-finish-entering');projectorFinishAnimationTimeout=setTimeout(()=>{view.classList.remove('projector-finish-entering','projector-finish-hidden');projectorFinishAnimationTimeout=null;},2800);}
+function startProjectorFinishEntrance(){
+ if(role!=='projector')return;
+ const view=$('projectorView');
+ clearProjectorFinishAnimationTimeout();
+ view.classList.remove('projector-finish-exiting','projector-finish-entering');
+ view.classList.add('projector-finish-hidden');
+ void view.offsetWidth;
+ view.classList.remove('projector-finish-hidden');
+ view.classList.add('projector-finish-entering');
+}
 function startProjectorFinishExit(){if(role!=='projector')return;const view=$('projectorView'),wasHidden=view.classList.contains('projector-finish-hidden');clearProjectorFinishAnimationTimeout();view.classList.remove('projector-finish-entering');if(wasHidden){view.classList.add('projector-finish-hidden');view.classList.remove('projector-finish-exiting');return;}view.classList.remove('projector-finish-exiting');void view.offsetWidth;view.classList.add('projector-finish-exiting');projectorFinishAnimationTimeout=setTimeout(()=>{view.classList.remove('projector-finish-exiting');view.classList.add('projector-finish-hidden');projectorFinishAnimationTimeout=null;},1800);}
-function hideProjectorFinishQuestionPoints(){const label=$('projectorFinishQuestionPoints');if(!label||label.classList.contains('hidden'))return;label.classList.remove('is-entering','is-exiting');void label.offsetWidth;label.classList.add('is-exiting');}
-function renderProjectorFinishQuestionPoints(state,previous){const label=$('projectorFinishQuestionPoints');if(!label)return;if(state.roundMode!=='finish'){label.classList.remove('is-entering','is-exiting');label.classList.add('hidden');return;}if(!Number.isInteger(state.finishQuestionIndex))return;label.textContent=Number.isInteger(state.finishQuestionPoints)?`${state.finishQuestionPoints} điểm`:'... điểm';const firstQuestion=previous?.roundMode==='finish'&&!Number.isInteger(previous.finishQuestionIndex);if(firstQuestion){label.classList.remove('hidden','is-entering','is-exiting');void label.offsetWidth;label.classList.add('is-entering');}else label.classList.remove('hidden');}
-$('projectorFinishQuestionPoints').addEventListener('animationend',event=>{const label=event.currentTarget;if(event.animationName==='projector-finish-question-points-in')label.classList.remove('is-entering');if(event.animationName==='projector-finish-question-points-out'){label.classList.remove('is-exiting');label.classList.add('hidden');}});
 function showProjectorFinishStartGraphic(){if(role!=='projector')return;const graphic=$('projectorFinishStartGraphic');if(projectorFinishStartExitTimeout){clearTimeout(projectorFinishStartExitTimeout);projectorFinishStartExitTimeout=null;}renderProjectorFinishStartGraphic();graphic.classList.remove('hidden','projector-finish-starting','projector-finish-start-exiting');void graphic.offsetWidth;graphic.classList.add('projector-finish-starting');}
 function hideProjectorFinishStartGraphic(){const graphic=$('projectorFinishStartGraphic');if(!graphic)return;if(projectorFinishStartExitTimeout){clearTimeout(projectorFinishStartExitTimeout);projectorFinishStartExitTimeout=null;}graphic.classList.remove('projector-finish-starting','projector-finish-start-exiting');graphic.classList.add('hidden');}
 function scheduleProjectorFinishStartGraphicExit(){const graphic=$('projectorFinishStartGraphic');if(!graphic||graphic.classList.contains('hidden'))return;if(projectorFinishStartExitTimeout)clearTimeout(projectorFinishStartExitTimeout);graphic.classList.remove('projector-finish-start-exiting');void graphic.offsetWidth;graphic.classList.add('projector-finish-start-exiting');projectorFinishStartExitTimeout=setTimeout(()=>{graphic.classList.remove('projector-finish-start-exiting','projector-finish-starting');graphic.classList.add('hidden');projectorFinishStartExitTimeout=null;},1700);}
@@ -142,14 +162,15 @@ $('gradeAnswers').onclick=()=>{
   toast(`Đã cộng điểm cho ${result.correctCount} đáp án đúng.`);
  });
 };
-$('finishPlayerSelect').addEventListener('change',()=>{$('startFinishRound').disabled=!$('finishPlayerSelect').value;refreshFinishCommitButton();});
-$('startFinishRound').onclick=async()=>{const result=await emitAck('host:finish:start',{playerId:$('finishPlayerSelect').value});if(!result.ok)return toast(result.error);$('hostQuestionInput').value='';toast('Đã chọn thí sinh Về đích; chuông của thí sinh này bị khóa.');};
+let finishSelectionResetTimer=null;
+$('finishPlayerSelect').addEventListener('change',()=>{clearTimeout(finishSelectionResetTimer);$('startFinishRound').disabled=!$('finishPlayerSelect').value;refreshFinishCommitButton();});
+$('startFinishRound').onclick=async()=>{const result=await emitAck('host:finish:start',{playerId:$('finishPlayerSelect').value});if(!result.ok)return toast(result.error);clearTimeout(finishSelectionResetTimer);$('hostQuestionInput').value='';toast('Đã chọn thí sinh Về đích; chuông của thí sinh này bị khóa.');};
 $('finishNshv').onclick=async()=>{const result=await emitAck('host:finish:nshv');if(!result.ok)toast(result.error);};
 $('finishBlank').onclick=async()=>{const result=await emitAck('host:opening:audio',{type:'blank'});if(!result.ok)toast(result.error);};
 $('finishCorrect').onclick=async()=>{const result=await emitAck('host:finish:judge',{correct:true});if(!result.ok)toast(result.error);};
 $('finishWrong').onclick=async()=>{const result=await emitAck('host:finish:judge',{correct:false});if(!result.ok)toast(result.error);};
 for(const seconds of [15,20,30])$(`finishTimer${seconds}`).onclick=async()=>{const result=await emitAck('host:finish:timer',{seconds});if(!result.ok)toast(result.error);};
-$('finishRoundSelect').addEventListener('change',refreshFinishCommitButton);
+$('finishRoundSelect').addEventListener('change',()=>{clearTimeout(finishSelectionResetTimer);refreshFinishCommitButton();});
 $('finishAllowFortyQuestionFour').addEventListener('change',updateFinishQuestionChoices);
 document.querySelectorAll('.finish-question-choice-grid input[type="radio"]').forEach(input=>input.addEventListener('change',refreshFinishCommitButton));
 updateFinishQuestionChoices();
@@ -568,7 +589,7 @@ $('openingAnswerCorrect').onclick=async()=>{
  const commonRound=latest?.openingStartArmed&&latest.openingQuestionRound==='Lượt chung';
  const saved=await emitAck('host:opening:judge',{playerId,result:'correct',points:commonRound?10:10+bonus});
  openingScorePending=false;
- $('openingAnswerCorrect').disabled=!$('spotlightPlayer').value;
+ $('openingAnswerCorrect').disabled=!$('spotlightPlayer').value||Boolean(latest?.openingSelectionResetPending);
  if(!saved.ok)return toast(saved.error);
  openingCorrectStreak=commonRound||bonus?0:nextStreak;
  if(bonus&&!commonRound)toast('Đúng 5 lần liên tiếp! Đã cộng thêm 20 điểm thưởng.');
@@ -578,11 +599,10 @@ $('openingAnswerIncorrect').onclick=async()=>{
  if(!playerId)return toast('Hãy chọn thí sinh trước.');
  const player=latest?.players.find(item=>item.id===playerId);
  if(!player)return toast('Không tìm thấy thí sinh đã chọn.');
- const result=await emitAck('host:opening:judge',{playerId,result:'wrong'});
+ const result=await emitAck('host:opening:judge',{playerId,result:'wrong',preventNegativeScore:$('openingScoreFloor').checked});
  if(!result.ok)return toast(result.error);
  openingCorrectStreak=0;
- const commonRound=latest?.openingStartArmed&&latest.openingQuestionRound==='Lượt chung';
- toast(commonRound?`${player.name}: câu trả lời sai, bị trừ 5 điểm.`:`${player.name}: câu trả lời sai, không bị trừ điểm.`);
+ toast(result.pointsDeducted>0?`${player.name}: câu trả lời sai, bị trừ ${result.pointsDeducted} điểm.`:`${player.name}: câu trả lời sai, không bị trừ điểm.`);
 };
 $('openingStartSound').onclick=async()=>{const result=await emitAck('host:opening:audio',{type:'start'});if(!result.ok)return toast(result.error);$('hostQuestionInput').value='';};
 $('openingEndSound').onclick=async()=>{
@@ -592,10 +612,8 @@ $('openingEndSound').onclick=async()=>{
  $('hostQuestionInput').value='';
  $('hostAnswerNote').value='';
  setOpeningNavigationEnabled(false);
- $('spotlightPlayer').value='';
  openingStreakPlayerId='';
  openingCorrectStreak=0;
- await saveSpotlightSelection();
 };
 async function startOpeningRound(mode){
  activeSpeedQuestionSlot=null;
@@ -621,6 +639,7 @@ $('waitFinishRound').onclick=async()=>{
   allowFortyQuestionFour:$('finishAllowFortyQuestionFour').checked
  });
  if(!result.ok)return toast(result.error);
+ clearTimeout(finishSelectionResetTimer);
  $('hostAnswerNote').value='';
  toast('Đã chốt 3 câu. Nhấn NextQs để hiển thị câu đầu tiên.');
 };
@@ -634,7 +653,8 @@ async function navigateFinishQuestion(direction){
 $('endFinishRound').onclick=async()=>{
  const result=await emitAck('host:finish:end');
  if(!result.ok)return toast(result.error);
- resetFinishQuestionSelection();
+ clearTimeout(finishSelectionResetTimer);
+ finishSelectionResetTimer=setTimeout(resetFinishQuestionSelection,2000);
  $('hostAnswerNote').value='';
 };
 async function navigateOpeningQuestion(direction){
@@ -814,7 +834,7 @@ function renderBuzzes(buzzes=[]){if(!$('hostBuzzes'))return;$('buzzCount').textC
 function queueNewProjectorBuzzes(state,previous){if(role!=='projector'||!previous)return;if(state.roundMode==='bonus'){if(previous.roundMode==='bonus'){const oldBuzzIds=new Set((previous.buzzes||[]).map(buzz=>buzz.id));for(const buzz of state.buzzes||[])if(!oldBuzzIds.has(buzz.id))queueProjectorBuzz();}return;}if(state.roundMode==='obstacle'){if(previous.roundMode==='obstacle'){const oldBuzzIds=new Set((previous.buzzes||[]).map(buzz=>buzz.id));for(const buzz of state.buzzes||[])if(!oldBuzzIds.has(buzz.id))queueProjectorAudio('buzzCNV');}return;}if(state.buzzerAlwaysOpen&&!(previous.buzzes||[]).length&&(state.buzzes||[]).length)queueProjectorBuzz();else if(!state.buzzerAlwaysOpen&&!previous.buzzerAlwaysOpen&&state.winnerId&&state.winnerId!==previous.winnerId)queueProjectorBuzz();}
 function renderProjectorObstacleBuzzes(state){const panel=$('projectorObstacleBuzzes'),buzzes=state.obstacleBuzzOrder||[];panel.replaceChildren();panel.classList.toggle('hidden',!buzzes.length);buzzes.forEach(buzz=>{const entry=document.createElement('div');entry.className='projector-obstacle-buzz-entry';entry.textContent=buzz.name;entry.title=buzz.name;panel.append(entry);});}
 socket.on('projector:audio',({type}={})=>{if(role!=='projector')return;if(type==='stopAllSFX'){stopAllProjectorSfx();return;}if(type==='start')startProjectorOpeningEntrance();if(type==='end')startProjectorOpeningExit();if(type==='startVDCombined')showProjectorFinishStartGraphic();if(type==='speedQuestionOpen')showProjectorSpeedQuestion();if(type==='showAnswerVCNV'&&latest?.roundMode==='obstacle')hideProjectorObstacleQuestion();if(['correct','wrong','start','end','opening','blank','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT',...Object.keys(finishAudioFiles),...Object.keys(hostCueAudioFiles)].includes(type))queueProjectorAudio(type);});
-socket.on('projector:finish:presentation',({action}={})=>{if(role!=='projector')return;if(action==='commit'){startProjectorFinishEntrance();scheduleProjectorFinishStartGraphicExit();}if(action==='end'){startProjectorFinishExit();hideProjectorFinishStartGraphic();hideProjectorFinishQuestionPoints();}});
+socket.on('projector:finish:presentation',({action}={})=>{if(role!=='projector')return;if(action==='commit'){startProjectorFinishEntrance();scheduleProjectorFinishStartGraphicExit();}if(action==='end'){startProjectorFinishExit();hideProjectorFinishStartGraphic();}});
 socket.on('projector:obstacle:answers',({rows,verdicts}={})=>{if(role!=='projector'||!Array.isArray(rows))return;projectorObstacleAnswerCells=Array.from({length:4},(_,row)=>Array.from({length:15},(_,cell)=>String(rows[row]?.[cell]||'')));projectorObstacleVerdicts=verdicts&&typeof verdicts==='object'?verdicts:{};if(latest?.roundMode==='obstacle')renderProjectorObstacle(latest);});
 socket.on('projector:obstacle:verdict',({row,verdict}={})=>{if(role!=='projector'||!Number.isInteger(row))return;projectorObstacleVerdicts[row]=verdict;if(verdict==='S')hideProjectorObstacleQuestion();if(latest?.roundMode==='obstacle')renderProjectorObstacle(latest);});
 socket.on('projector:obstacle:question-presentation',({action}={})=>{if(role==='projector'&&action==='show')scheduleProjectorObstacleQuestionEntrance();});
@@ -1061,7 +1081,56 @@ function syncProjectorFinishStar(state,previous){
  image.src='/DoHoa/nshv-star.webp?activation='+(++projectorFinishStarActivation);
  star.replaceChildren(image);
 }
-function renderProjector(state,previous){syncProjectorFinishStar(state,previous);syncProjectorSummary(state);$('projectorView').classList.toggle('projector-summary-mode',state.roundMode==='summary');renderProjectorFinishQuestionPoints(state,previous);const playerRound=state.roundMode==='obstacle'||state.roundMode==='speed';$('projectorView').classList.toggle('projector-round-player-mode',playerRound);$('projectorQuestion').textContent=state.question||'';fitProjectorQuestion();const board=$('projectorScoreboard');board.innerHTML='';const projectorPlayerBoard=$('projectorPlayerScoreboard');projectorPlayerBoard.innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;const players=[...state.players];if(!players.length){const empty=document.createElement('p');empty.className='projector-empty';empty.textContent='Đang chờ thí sinh';board.append(empty);const playerEmpty=document.createElement('p');playerEmpty.className='muted';playerEmpty.textContent='Đang chờ thí sinh';projectorPlayerBoard.append(playerEmpty);}else{players.forEach(p=>{const row=document.createElement('div');row.className='projector-player';if(p.id===fastestId)row.classList.add('fastest-buzzer');const identity=document.createElement('div');identity.className='projector-player-identity';const name=document.createElement('strong');name.textContent=p.name;identity.append(name);const score=document.createElement('strong');score.className='projector-player-score';score.textContent=p.score;row.append(identity,score);board.append(row);projectorPlayerBoard.append(scoreRow(p,false,p.id===fastestId));});}scaleProjectorScoreboard();renderPlayerQuestion(state);applySpotlightClass(projectorPlayerBoard,players);}
+function renderProjectorRoundScores(state){
+ const board=$('projectorHorizontalScores');
+ const openingSelected=state.roundMode==='opening'&&Boolean(state.spotlightRound);
+ const common=openingSelected&&state.spotlightRound==='Lượt chung';
+ const individual=openingSelected&&!common;
+ const finish=state.roundMode==='finish';
+ const showDetail=individual||finish;
+ const visible=(openingSelected||finish)&&state.players.length>0;
+ const selectedId=finish?state.finishPlayerId:individual?state.spotlightPlayerId:null;
+ const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;
+ $('projectorView').classList.toggle('projector-opening-common',common);
+ $('projectorScoreboard').classList.toggle('hidden',showDetail);
+ $('projectorScoreDetail').classList.toggle('hidden',!showDetail);
+ if(showDetail){
+  const label=$('projectorScoreDetailLabel');
+  label.classList.toggle('projector-score-detail-label-finish',finish);
+  if(finish){
+   const points=state.finishQuestionPoints??state.finishEndingQuestionPoints;
+   label.textContent=Number.isInteger(points)?`${points} điểm`:'';
+  }else{
+   const current=state.openingQuestionRound===state.spotlightRound&&Number.isInteger(state.openingQuestionIndex)?state.openingQuestionIndex+1:0;
+   label.textContent=`${current}/${state.openingSelectedRoundQuestionCount}`;
+  }
+  const player=state.players.find(player=>player.id===selectedId);
+  $('projectorScoreDetailPoints').textContent=player?.score??'–';
+ }
+ board.classList.toggle('hidden',!visible);
+ if(!visible){
+  board.replaceChildren();
+  return;
+ }
+ // Keep the cells mounted so room updates don't restart their entrance animations.
+ while(board.children.length>state.players.length)board.lastElementChild.remove();
+ state.players.forEach((player,index)=>{
+  let cell=board.children[index];
+  if(!cell){
+   cell=document.createElement('div');
+   cell.style.setProperty('--horizontal-score-index',index);
+   board.append(cell);
+  }
+  const selected=player.id===selectedId;
+  const wonBuzzer=(common||finish)&&player.id===fastestId;
+  cell.classList.toggle('spotlight-player',selected&&!wonBuzzer);
+  cell.classList.toggle('fastest-buzzer',wonBuzzer);
+  cell.textContent=selected?player.name:`${player.name} (${player.score})`;
+ });
+}
+function renderProjector(state,previous){
+ renderProjectorRoundScores(state);
+ syncProjectorFinishStar(state,previous);syncProjectorSummary(state);$('projectorView').classList.toggle('projector-summary-mode',state.roundMode==='summary');const playerRound=state.roundMode==='obstacle'||state.roundMode==='speed';$('projectorView').classList.toggle('projector-round-player-mode',playerRound);$('projectorQuestion').textContent=state.question||'';fitProjectorQuestion();const board=$('projectorScoreboard');board.innerHTML='';const projectorPlayerBoard=$('projectorPlayerScoreboard');projectorPlayerBoard.innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;const players=[...state.players];if(!players.length){const empty=document.createElement('p');empty.className='projector-empty';empty.textContent='Đang chờ thí sinh';board.append(empty);const playerEmpty=document.createElement('p');playerEmpty.className='muted';playerEmpty.textContent='Đang chờ thí sinh';projectorPlayerBoard.append(playerEmpty);}else{players.forEach(p=>{const row=document.createElement('div');row.className='projector-player';if(p.id===fastestId)row.classList.add('fastest-buzzer');const identity=document.createElement('div');identity.className='projector-player-identity';const name=document.createElement('strong');name.textContent=p.name;identity.append(name);const score=document.createElement('strong');score.className='projector-player-score';score.textContent=p.score;row.append(identity,score);board.append(row);projectorPlayerBoard.append(scoreRow(p,false,p.id===fastestId));});}scaleProjectorScoreboard();renderPlayerQuestion(state);applySpotlightClass(projectorPlayerBoard,players);}
 function fastestBuzzerId(buzzes=[]){return buzzes[0]?.playerId||null;}
 function fitQuestionText(text,container=text,allowNarrow=true){
  if(!text||!container||!container.clientWidth||!container.clientHeight)return;
@@ -1113,6 +1182,11 @@ function fitProjectorQuestion(){fitQuestionText($('projectorQuestion'));}
 function fitPlayerQuestion(){fitQuestionText($('questionDisplayText'),$('questionDisplay').classList.contains('player-obstacle-active')?$('playerQuestionTextArea'):$('questionDisplay'),false);}
 function scaleProjectorScoreboard(){if(!$('projectorView')||$('projectorView').classList.contains('hidden'))return;const panel=document.querySelector('.projector-score-panel'),board=$('projectorScoreboard');if(!panel||!board)return;const players=board.querySelectorAll('.projector-player');if(!players.length){board.style.setProperty('--projector-rows','1');board.style.setProperty('--projector-scale','1');return;}const rowHeight=board.clientHeight/players.length,scale=Math.max(.15,Math.min(1,rowHeight/148.5,board.clientWidth/607.5));board.style.setProperty('--projector-rows',String(players.length));board.style.setProperty('--projector-scale',String(scale));}
 const projectorObserver=new ResizeObserver(()=>{scaleProjectorScoreboard();fitProjectorQuestion();});projectorObserver.observe(document.querySelector('.projector-score-panel'));projectorObserver.observe(document.querySelector('.projector-question-panel'));window.addEventListener('resize',()=>{scaleProjectorScoreboard();fitProjectorQuestion();});
+const projectorHorizontalScores=$('projectorHorizontalScores');
+const projectorHorizontalScoresObserver=new ResizeObserver(()=>{
+ projectorHorizontalScores.closest('.projector-stage').style.setProperty('--horizontal-scores-height',`${projectorHorizontalScores.offsetHeight}px`);
+});
+projectorHorizontalScoresObserver.observe(projectorHorizontalScores);
 const playerQuestionObserver=new ResizeObserver(()=>fitPlayerQuestion());playerQuestionObserver.observe($('questionDisplay'));window.addEventListener('resize',()=>requestAnimationFrame(fitPlayerQuestion));
 function scoreRow(p,actions,highlight=false,judgeSteal=false){const row=document.createElement('div');row.className='playerrow';if(highlight||(latest?.roundMode==='obstacle'&&p.obstacleBuzzed))row.classList.add('fastest-buzzer');if(actions&&p.focused===false){row.classList.add('unfocused-player');row.title='Thí sinh đang rời khỏi trang này hoặc không focus vào trang.';}const name=document.createElement('div');name.innerHTML=`<div class="playername"><i class="${p.connected?'connected':'connected disconnected'}"></i></div><div class="playerteam"></div>`;name.querySelector('.playername').append(document.createTextNode(p.name));name.querySelector('.playerteam').textContent=p.team;const pts=document.createElement('div');pts.className='points';pts.textContent=p.score;row.append(name,pts);if(actions){const a=document.createElement('div');a.className='scoreactions';if(judgeSteal){for(const [label,correct] of [['ĐÚNG',true],['SAI',false]]){const b=document.createElement('button');b.textContent=label;b.onclick=async()=>{const result=await emitAck('host:finish:judge',{correct});if(!result.ok)toast(result.error);};a.append(b);}}const customInput=document.createElement('input');customInput.type='number';customInput.min='-100';customInput.max='1000';customInput.step='1';customInput.placeholder='Điểm';customInput.setAttribute('aria-label',`Số điểm thay đổi cho ${p.name}`);const customButton=document.createElement('button');customButton.textContent='ÁP DỤNG';customButton.title='Áp dụng số điểm đã nhập';customButton.onclick=()=>{const delta=Number(customInput.value);if(!Number.isInteger(delta)||delta< -100||delta>1000)return toast('Nhập số nguyên từ -100 đến 1000.');changeScore(p.id,delta);};a.append(customInput,customButton);const rm=document.createElement('button');rm.textContent='×';rm.title='Xóa người chơi';rm.onclick=()=>emitAck('host:remove',{playerId:p.id});a.append(rm);row.append(a);}return row;}
 async function changeScore(playerId,delta){const r=await emitAck('host:score',{playerId,delta});if(!r.ok){toast(r.error);return false;}return true;}
@@ -1275,8 +1349,9 @@ function refreshSpotlightControls(state){
  }
  roundSelect.value=state&&rounds.includes(state.spotlightRound)?state.spotlightRound:'';
  playerSelect.value=state&&players.some(player=>player.id===state.spotlightPlayerId)?state.spotlightPlayerId:'';
- $('openingAnswerCorrect').disabled=!playerSelect.value;
- $('openingAnswerIncorrect').disabled=!playerSelect.value;
+ const judgingDisabled=!playerSelect.value||Boolean(state?.openingSelectionResetPending);
+ $('openingAnswerCorrect').disabled=judgingDisabled;
+ $('openingAnswerIncorrect').disabled=judgingDisabled;
 }
 async function saveSpotlightSelection(){
  if(role!=='host')return;
