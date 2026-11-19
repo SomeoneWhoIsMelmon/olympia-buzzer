@@ -22,6 +22,11 @@ app.get('/health', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
 
 const code = () => crypto.randomBytes(3).toString('hex').toUpperCase();
 const clean = (s, max = 24) => String(s || '').trim().replace(/[<>]/g, '').slice(0, max);
+function scoreboardPlayerIds(room) {
+  const remaining = new Set(room.players.keys());
+  const ordered = (room.scoreboardOrder || []).filter(id => remaining.delete(id));
+  return [...ordered, ...remaining];
+}
 function publicRoom(room) {
   return {
     code: room.code, status: room.status, duration: room.duration, question: room.question || '',
@@ -40,6 +45,7 @@ function publicRoom(room) {
     summaryPresentation: room.summaryPresentation || null,
     bonusRemainingMs: room.bonusRemainingMs ?? 15000,
     bonusStarted: Boolean(room.bonusStarted), bonusArmed: Boolean(room.bonusArmed),
+    bonusPlayerIds: room.bonusPlayerIds || [],
     obstacleDisplayRows: room.roundMode === 'obstacle' ? room.obstacleCourse.rows.map((row,index)=>{
       const verdict=room.obstacleVerdicts?.[index+1]||'';
       const cells=Array.isArray(row.answerCells)?row.answerCells:obstacleAnswerCells(row.answer);
@@ -49,7 +55,7 @@ function publicRoom(room) {
       })};
     }) : [],
     roundMode: room.roundMode || 'opening', obstacleStarted: Boolean(room.obstacleStarted), obstacleSelectedRow: room.obstacleSelectedRow || null, obstacleRowsSelected: [...(room.obstacleRowsSelected || [])], obstaclePictureOpen: Boolean(room.obstaclePictureOpen), obstaclePictureRevealed: [...(room.obstaclePictureRevealed || [])], obstaclePictureEverRevealed: [...(room.obstaclePictureEverRevealed || [])], obstacleBuzzOrder: room.obstacleBuzzOrder || [],
-    players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, team: p.team, score: p.score, connected: p.connected, focused: p.focused !== false, buzzedAt: p.buzzedAt, obstacleBuzzed: Boolean(p.obstacleBuzzed), obstacleBuzzUsed: Boolean(p.obstacleBuzzUsed), obstacleBuzzJudged: Boolean(p.obstacleBuzzJudged), answerSubmitted: Boolean(p.answerSubmitted), latestAnswer: p.latestAnswer || null })),
+    players: scoreboardPlayerIds(room).map(id => room.players.get(id)).map(p => ({ id: p.id, name: p.name, team: p.team, score: p.score, connected: p.connected, focused: p.focused !== false, buzzedAt: p.buzzedAt, obstacleBuzzed: Boolean(p.obstacleBuzzed), obstacleBuzzUsed: Boolean(p.obstacleBuzzUsed), obstacleBuzzJudged: Boolean(p.obstacleBuzzJudged), answerSubmitted: Boolean(p.answerSubmitted), latestAnswer: p.latestAnswer || null })),
     teams: room.teams, answerCount: room.answers.length, independentTimer: { duration: room.independentTimer.duration, running: room.independentTimer.running, deadline: room.independentTimer.deadline, remainingMs: room.independentTimer.running && room.independentTimer.deadline ? Math.max(0, room.independentTimer.deadline - Date.now()) : room.independentTimer.remainingMs, startedAt: room.independentTimer.startedAt }
   };
 }
@@ -81,12 +87,20 @@ function obstacleAnswerCells(answer = '') { const cells = Array(15).fill(''); fo
 function emitProjectorObstacleAnswers(room, target = `${room.code}:projector`) {
   io.to(target).emit('projector:obstacle:answers', { rows: room.obstacleCourse.rows.map(row => Array.isArray(row.answerCells) ? row.answerCells.slice(0, 15) : obstacleAnswerCells(row.answer)), verdicts: room.obstacleVerdicts || {} });
 }
+function cancelPlayerAnswerReveal(room) {
+  clearTimeout(room.playerAnswerRevealTimer);
+  room.playerAnswerRevealTimer = null;
+}
+function hideProjectorAnswers(room) {
+  cancelPlayerAnswerReveal(room);
+  io.to(room.code).emit('projector:answer:hide');
+}
 function clearRoomAnswers(room) {
   room.answers = [];
   for (const player of room.players.values()) { player.latestAnswer = null; player.answerSubmitted = false; }
   emitRoom(room);
   emitHostAnswers(room);
-  io.to(room.code).emit('projector:answer:hide');
+  hideProjectorAnswers(room);
 }
 function emitDatabaseQuestionsUpdate(room) {
   if (room.hostId) io.to(room.hostId).emit('host:database:questions:update', room.questions);
@@ -110,6 +124,22 @@ function getActiveRoundMedia(room) {
 function emitActiveRoundMedia(room, target = room.code) {
   const media = getActiveRoundMedia(room);
   io.to(target).emit('round:media', media ? { name: media.name, type: media.type, data: media.data } : null);
+}
+function youtubeVideoId(link) {
+  if (typeof link !== 'string' || link.length > 2048) return null;
+  let url;
+  try { url = new URL(link.trim()); } catch { return null; }
+  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.port) return null;
+  let id;
+  if (url.hostname === 'youtu.be') {
+    id = url.pathname.match(/^\/([^/]+)\/?$/)?.[1];
+  } else if (['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(url.hostname)) {
+    id = url.pathname === '/watch' ? url.searchParams.get('v') : url.pathname.match(/^\/(?:shorts|live|embed)\/([^/]+)\/?$/)?.[1];
+  }
+  return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+}
+function introMediaMetadata({ name, type, size, youtubeId }) {
+  return youtubeId ? { name, youtubeId } : { name, type, size };
 }
 function stopTimer(room) { if (room.timer) clearTimeout(room.timer); room.timer = null; }
 function stopOpeningTimer(room) {
@@ -172,6 +202,7 @@ function startBuzzerRound(room, duration, preserveOpening = false) {
     room.openingStartArmed = false;
   }
   room.duration = Math.max(1, Math.min(300, Number(duration) || room.duration || 5));
+  cancelPlayerAnswerReveal(room);
   room.winnerId = null; room.answers = []; room.buzzes = []; room.roundStartedAt = Date.now();
   for (const player of room.players.values()) { player.buzzedAt = null; player.answerSubmitted = false; player.latestAnswer = null; }
   room.status = 'playing'; room.deadline = Date.now() + room.duration * 1000;
@@ -235,6 +266,7 @@ io.on('connection', socket => {
     emitProjectorObstacleAnswers(room, socket.id);
   });
   socket.on('host:create', ({ hostName, duration, teams } = {}, ack = () => {}) => {
+    if (socket.data.role) return ack({ ok: false, error: 'Kết nối đã tham gia một phòng.' });
     let roomCode; do { roomCode = code(); } while (rooms.has(roomCode));
     const room = {
       code: roomCode, hostId: socket.id, hostName: clean(hostName, 24) || 'Host', question: '', projectorVolume: 1, obstacleVerdicts: {}, obstacleStarted: false, obstacleSelectedRow: null, obstacleRowsSelected: new Set(), obstaclePictureOpen: false, obstaclePictureRevealed: new Set(), obstaclePictureEverRevealed: new Set(), obstacleBuzzOrder: [],
@@ -244,18 +276,29 @@ io.on('connection', socket => {
       players: new Map(), answers: [], buzzes: [], questions: [], introMedia: [...introMediaDefaults, ...Array(11).fill(null)], speedQuestions: Array.from({ length: 4 }, () => ({ prompt: '', answer: '', media: null })), obstacleCourse: { rows: Array.from({ length: 4 }, () => ({ answer: '', answerCells: Array(15).fill(''), question: '' })), keyword: '', keywordQuestion: '', fullAnswer: '', media: null }, finishRounds: Array.from({ length: 4 }, () => Array.from({ length: 7 }, () => ({ question: '', answer: '' }))), finishQuestionSequence: [], finishQuestionRound: null, finishQuestionIndex: null, finishQuestionPoints: null, finishAllowFortyQuestionFour: false, finishPlayerId: null, finishStealPending: false, finishStealNshv: false, roundMode: 'intro', activeSpeedQuestionSlot: null, databaseAccessToken: null, spotlightRound: '', spotlightPlayerId: null, openingQuestionRound: '', openingQuestionIndex: null, openingQuestionMode: '', openingStartArmed: false, openingEmptyQuestionNumber: null, openingDeadline: null, openingTimer: null, openingTimerKind: null, roundStartedAt: null, status: 'waiting', deadline: null, timer: null, buzzerCountdownDeadline: null, buzzerCountdownTimer: null, winnerCountdownDeadline: null, winnerCountdownTimer: null, winnerId: null, independentTimer: { duration: 60, remainingMs: 60000, deadline: null, startedAt: null, handle: null }
     };
     if (!room.teams.length) room.teams = ['Đội 1', 'Đội 2'];
+    room.hostResumeToken = crypto.randomBytes(32).toString('hex');
+    room.password = String(crypto.randomInt(100000, 1000000));
     rooms.set(roomCode, room); socket.join(roomCode);
     socket.data.roomCode = roomCode; socket.data.role = 'host';
-    ack({ ok: true, code: roomCode, state: publicRoom(room) });
+    ack({ ok: true, code: roomCode, password: room.password, resumeToken: room.hostResumeToken, state: publicRoom(room) });
   });
 
-  socket.on('host:rejoin', ({ code: rawCode } = {}, ack = () => {}) => {
+  socket.on('host:rejoin', ({ code: rawCode, resumeToken } = {}, ack = () => {}) => {
     const room = rooms.get(clean(rawCode, 8).toUpperCase());
-    if (!room) return ack({ ok: false, error: 'Không tìm thấy phòng.' });
-    // A room host can reclaim control only when the previous host disconnected.
-    if (room.hostId && room.hostId !== socket.id && io.sockets.sockets.has(room.hostId)) return ack({ ok: false, error: 'Phòng đang có Host điều khiển.' });
+    if (!room || typeof resumeToken !== 'string' || !room.hostResumeToken || room.hostResumeToken !== resumeToken) {
+      return ack({ ok: false, error: 'Phiên Host đã hết hiệu lực hoặc phòng không còn tồn tại.' });
+    }
+    if (socket.data.role && !isHost(room)) return ack({ ok: false, error: 'Kết nối đã tham gia một phòng.' });
+    const previousHost = io.sockets.sockets.get(room.hostId);
+    if (previousHost && previousHost !== socket && previousHost.data.role === 'host' && previousHost.data.roomCode === room.code) {
+      previousHost.leave(room.code);
+      delete previousHost.data.roomCode;
+      delete previousHost.data.role;
+      previousHost.emit('host:replaced');
+    }
     room.hostId = socket.id; socket.join(room.code); socket.data.roomCode = room.code; socket.data.role = 'host';
-    ack({ ok: true, state: publicRoom(room) }); emitHostAnswers(room);
+    ack({ ok: true, password: room.password, state: publicRoom(room), answers: room.answers, activeSpeedQuestionSlot: room.activeSpeedQuestionSlot });
+    emitActiveRoundMedia(room, socket.id);
   });
   socket.on('host:database:token', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
@@ -275,24 +318,61 @@ io.on('connection', socket => {
     ack({ ok: true, code: room.code });
   });
 
+  function attachPlayer(room, player) {
+    player.socketId = socket.id;
+    player.connected = true;
+    player.focused = true;
+    socket.data.roomCode = room.code;
+    socket.data.role = 'player';
+    socket.data.playerId = player.id;
+    socket.join(room.code);
+  }
+
   socket.on('player:join', ({ code: rawCode, name, team } = {}, ack = () => {}) => {
+    if (socket.data.role) return ack({ ok: false, error: 'Kết nối đã tham gia một phòng.' });
     const room = rooms.get(clean(rawCode, 8).toUpperCase());
     if (!room) return ack({ ok: false, error: 'Mã phòng không hợp lệ.' });
     if (room.deadline && Date.now() < room.deadline) return ack({ ok: false, error: 'Lượt đang diễn ra, Host tạm khóa người chơi mới.' });
     const playerName = clean(name, 24);
     if (!playerName) return ack({ ok: false, error: 'Bạn cần nhập tên.' });
     const chosenTeam = room.teams.includes(team) ? team : room.teams[0];
-    const player = { id: socket.id, name: playerName, team: chosenTeam, score: 0, connected: true, focused: true, buzzedAt: null, obstacleBuzzed: false, obstacleBuzzUsed: false, obstacleBuzzJudged: false, answerSubmitted: false, latestAnswer: null };
-    room.players.set(socket.id, player); socket.join(room.code);
-    socket.data.roomCode = room.code; socket.data.role = 'player';
-    ack({ ok: true, playerId: socket.id, state: publicRoom(room) }); emitRoom(room); emitActiveRoundMedia(room, socket.id);
+    const player = { id: crypto.randomUUID(), resumeToken: crypto.randomBytes(32).toString('hex'), name: playerName, team: chosenTeam, score: 0, buzzedAt: null, obstacleBuzzed: false, obstacleBuzzUsed: false, obstacleBuzzJudged: false, answerSubmitted: false, latestAnswer: null };
+    room.players.set(player.id, player);
+    attachPlayer(room, player);
+    ack({ ok: true, playerId: player.id, resumeToken: player.resumeToken, state: publicRoom(room) });
+    emitRoom(room);
+    emitActiveRoundMedia(room, socket.id);
+  });
+
+  socket.on('player:resume', ({ code: rawCode, playerId, resumeToken } = {}, ack = () => {}) => {
+    const room = rooms.get(clean(rawCode, 8).toUpperCase());
+    const player = room?.players.get(playerId);
+    if (!player || typeof resumeToken !== 'string' || player.resumeToken !== resumeToken) {
+      return ack({ ok: false, error: 'Phiên thí sinh đã hết hiệu lực. Hãy vào phòng lại.' });
+    }
+    if (socket.data.role && (socket.data.playerId !== player.id || socket.data.roomCode !== room.code)) {
+      return ack({ ok: false, error: 'Kết nối đã tham gia một phòng.' });
+    }
+    const previousSocket = io.sockets.sockets.get(player.socketId);
+    if (previousSocket && previousSocket !== socket) {
+      previousSocket.leave(room.code);
+      delete previousSocket.data.playerId;
+      delete previousSocket.data.role;
+      delete previousSocket.data.roomCode;
+      previousSocket.emit('player:kicked', { resumedElsewhere: true });
+    }
+    attachPlayer(room, player);
+    ack({ ok: true, playerId: player.id, state: publicRoom(room) });
+    emitRoom(room);
+    emitActiveRoundMedia(room, socket.id);
   });
 
   socket.on('player:answer', ({ answer } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'player') return ack({ ok: false, error: 'Không tìm thấy phòng.' });
-    const player = room.players.get(socket.id);
+    const player = room.players.get(socket.data.playerId);
     if (!player) return ack({ ok: false, error: 'Không tìm thấy người chơi.' });
+    if (room.roundMode === 'bonus' && !room.bonusPlayerIds?.includes(player.id)) return ack({ ok: false, error: 'Bạn không được chọn tham gia Câu hỏi phụ.' });
     if (room.roundMode === 'obstacle' && player.obstacleBuzzUsed) return ack({ ok: false, error: 'Bạn đã bấm chuông Vượt chướng ngại vật rồi.' });
     const at = room.independentTimer;
     const canSubmit = Boolean(at && at.running && at.deadline && Date.now() < at.deadline);
@@ -313,7 +393,7 @@ io.on('connection', socket => {
   socket.on('player:focus', ({ focused } = {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'player' || typeof focused !== 'boolean') return;
-    const player = room.players.get(socket.id);
+    const player = room.players.get(socket.data.playerId);
     if (!player || player.focused === focused) return;
     player.focused = focused;
     emitRoom(room);
@@ -322,9 +402,10 @@ io.on('connection', socket => {
   socket.on('player:buzz', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'player') return ack({ ok: false, error: 'Không tìm thấy phòng.' });
-    const player = room.players.get(socket.id);
+    const player = room.players.get(socket.data.playerId);
     if (!player) return ack({ ok: false, error: 'Không tìm thấy người chơi.' });
     if (room.roundMode === 'bonus') {
+      if (!room.bonusPlayerIds?.includes(player.id)) return ack({ ok: false, error: 'Bạn không được chọn tham gia Câu hỏi phụ.' });
       if (!room.bonusStarted) {
         if (!room.bonusArmed || room.status !== 'playing' || player.buzzedAt) return ack({ ok: false, error: 'Chuông đang khóa.' });
         player.buzzedAt = Date.now();
@@ -407,6 +488,7 @@ io.on('connection', socket => {
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (room.roundMode === 'obstacle' && Number.isInteger(obstacleRow) && room.obstaclePictureOpen) return ack({ ok: false, error: 'Hãy tắt Mở ảnh trước khi chọn hàng ngang.' });
     if (typeof clearAnswers !== 'boolean') return ack({ ok: false, error: 'Trạng thái xóa câu trả lời không hợp lệ.' });
+    if (room.roundMode === 'bonus' && !room.bonusPlayerIds?.length) return ack({ ok: false, error: 'Hãy chọn thí sinh tham gia Câu hỏi phụ.' });
     if (resetBuzzer) stopBuzzerCountdown(room);
     if (room.roundMode === 'bonus') {
       stopTimer(room); stopWinnerCountdown(room); room.deadline = null; room.status = 'playing'; room.bonusRemainingMs = 15000; room.bonusStarted = false; room.bonusArmed = true;
@@ -432,7 +514,7 @@ io.on('connection', socket => {
       for (const player of room.players.values()) { player.latestAnswer = null; player.answerSubmitted = false; }
     }
     emitRoom(room);
-    if (clearAnswers) { emitHostAnswers(room); io.to(room.code).emit('projector:answer:hide'); }
+    if (clearAnswers) { emitHostAnswers(room); hideProjectorAnswers(room); }
     if (room.roundMode === 'bonus') io.to(`${room.code}:projector`).emit('projector:bonus:presentation', { show: true });
     ack({ ok: true });
   });
@@ -578,7 +660,7 @@ io.on('connection', socket => {
     io.to(room.code).emit('projector:audio', { type: correct ? 'finishCorrect' : 'finishWrong' });
     ack({ ok: true, delta, finishNshv: Boolean(room.finishNshv) });
   });
-  socket.on('host:round-mode', ({ round, speedSlot, openMedia = false } = {}, ack = () => {}) => {
+  socket.on('host:round-mode', ({ round, speedSlot, openMedia = false, bonusPlayerIds } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     const allowedRounds = ['intro', 'opening', 'obstacle', 'speed', 'finish', 'bonus', 'summary'];
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
@@ -587,7 +669,20 @@ io.on('connection', socket => {
     if (openMedia && round !== 'speed') return ack({ ok: false, error: 'Chỉ có thể mở media cho câu Tăng tốc.' });
     if (round === 'speed' && speedSlot !== undefined && speedSlot !== null && (!Number.isInteger(speedSlot) || speedSlot < 0 || speedSlot >= room.speedQuestions.length)) return ack({ ok: false, error: 'Câu Tăng tốc không hợp lệ.' });
     if (openMedia && !Number.isInteger(speedSlot)) return ack({ ok: false, error: 'Hãy chọn câu Tăng tốc trước khi mở media.' });
-    if (room.roundMode === 'bonus' && round !== 'bonus') { stopTimer(room); room.deadline = null; room.status = 'locked'; room.bonusStarted = false; room.bonusArmed = false; bonusAudio(room, false); }
+    if (round === 'bonus' && (!Array.isArray(bonusPlayerIds) || !bonusPlayerIds.length || bonusPlayerIds.some(id => !room.players.has(id)))) {
+      return ack({ ok: false, error: 'Hãy chọn ít nhất một thí sinh có trong phòng.' });
+    }
+    if (round === 'bonus' || room.roundMode === 'bonus') {
+      stopTimer(room);
+      stopBuzzerCountdown(room);
+      room.deadline = null;
+      room.status = 'locked';
+      room.bonusRemainingMs = 15000;
+      room.bonusStarted = false;
+      room.bonusArmed = false;
+      room.bonusPlayerIds = round === 'bonus' ? [...new Set(bonusPlayerIds)] : [];
+      bonusAudio(room, false);
+    }
     room.question = '';
     room.openingQuestionRound = '';
     room.openingQuestionIndex = null;
@@ -597,10 +692,10 @@ io.on('connection', socket => {
     room.finishNshv = false;
     room.obstacleSelectedRow = null;
     stopOpeningTimer(room);
-    io.to(room.code).emit('projector:answer:hide');
+    hideProjectorAnswers(room);
     room.summaryPresentation = round === 'summary' ? {
       startedAt: Date.now() + 1000,
-      players: [...room.players.values()].map((player, joinOrder) => ({ name: player.name, score: player.score, joinOrder })).sort((a, b) => a.score - b.score || a.joinOrder - b.joinOrder)
+      players: [...room.players.values()].map((player, joinOrder) => ({ id: player.id, name: player.name, score: player.score, joinOrder })).sort((a, b) => a.score - b.score || a.joinOrder - b.joinOrder)
     } : null;
     room.obstacleGreenScreenQuestion = false;
     room.speedQuestionOpened = round === 'speed' && openMedia;
@@ -621,6 +716,7 @@ io.on('connection', socket => {
     if (round === 'obstacle') { room.obstacleVerdicts = {}; room.obstacleStarted = false; room.obstacleSelectedRow = null; room.obstacleRowsSelected.clear(); room.obstaclePictureOpen = false; room.obstaclePictureRevealed.clear(); room.obstaclePictureEverRevealed.clear(); room.obstacleBuzzOrder = []; room.buzzes = []; for (const player of room.players.values()) { player.buzzedAt = null; player.obstacleBuzzed = false; player.obstacleBuzzUsed = false; player.obstacleBuzzJudged = false; } }
     room.activeSpeedQuestionSlot = round === 'speed' && openMedia && Number.isInteger(speedSlot) ? speedSlot : null;
     emitRoom(room);
+    if (round === 'bonus') io.to(`${room.code}:projector`).emit('projector:bonus:presentation', { show: false });
     emitActiveRoundMedia(room);
     if (round === 'obstacle') emitProjectorObstacleAnswers(room);
     ack({ ok: true });
@@ -635,6 +731,7 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room) || room.roundMode !== 'bonus') return ack({ ok: false, error: 'Hãy chọn phần Câu hỏi phụ.' });
     if (action === 'start') {
+      if (!room.bonusPlayerIds?.length) return ack({ ok: false, error: 'Hãy chọn thí sinh tham gia Câu hỏi phụ.' });
       if (room.bonusStarted || !room.bonusArmed || !room.question) return ack({ ok: false, error: 'Hãy mở câu hỏi trước khi bắt đầu lượt mới.' });
       stopBuzzerCountdown(room); stopWinnerCountdown(room); stopOpeningTimer(room);
       room.bonusRemainingMs = 15000; room.bonusStarted = true; room.roundStartedAt = Date.now();
@@ -667,7 +764,7 @@ io.on('connection', socket => {
     if (![5, 6, 7].includes(slot)) return ack({ ok: false, error: 'Invalid media slot.' });
     const media = room.introMedia[slot];
     if (!media) return ack({ ok: false, error: 'Chưa có media trong MediaDatabase.' });
-    io.to(`${room.code}:projector`).emit('projector:overlay:media', { name: media.name, type: media.type, data: media.data });
+    io.to(`${room.code}:projector`).emit('projector:overlay:media', media);
     ack({ ok: true });
   });
   socket.on('host:overlay:close', (_payload, ack = () => {}) => {
@@ -683,7 +780,7 @@ io.on('connection', socket => {
     if (!Number.isInteger(slot) || slot < 0 || slot >= room.introMedia.length) return ack({ ok: false, error: 'Ô Intro không hợp lệ.' });
     const media = room.introMedia[slot];
     if (!media) return ack({ ok: false, error: 'Chưa có media cho Intro này trong MEDIADATABASE.' });
-    io.to(`${room.code}:projector`).emit('projector:intro:media', { name: media.name, type: media.type, data: media.data });
+    io.to(`${room.code}:projector`).emit('projector:intro:media', media);
     ack({ ok: true });
   });
   socket.on('host:speed:answer-media', ({ index } = {}, ack = () => {}) => {
@@ -985,6 +1082,7 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
     stopBuzzerCountdown(room); stopWinnerCountdown(room); stopTimer(room); stopOpeningTimer(room); stopIndependentTimer(room, false); room.independentTimer.remainingMs = room.independentTimer.duration * 1000; room.independentTimer.startedAt = null; room.independentTimer.startedAt = null; room.status = 'waiting'; room.deadline = null; room.openingQuestionRound = ''; room.openingQuestionIndex = null; room.openingQuestionMode = ''; room.openingStartArmed = false; room.openingEmptyQuestionNumber = null; room.winnerId = null; room.roundStartedAt = null; room.answers = []; room.buzzes = [];
+    cancelPlayerAnswerReveal(room);
     for (const p of room.players.values()) { p.buzzedAt = null; p.answerSubmitted = false; p.latestAnswer = null; }
     emitRoom(room); emitHostAnswers(room); ack({ ok: true });
   });
@@ -1071,7 +1169,7 @@ io.on('connection', socket => {
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
     if (room.roundMode === 'obstacle') { room.obstacleGreenScreenQuestion = false; emitRoom(room); }
     const answers = [...room.players.values()]
-      .filter(player => player.latestAnswer)
+      .filter(player => player.latestAnswer && (room.roundMode !== 'bonus' || room.bonusPlayerIds?.includes(player.id)))
       .map(player => ({
         id: player.latestAnswer.id,
         name: player.name,
@@ -1082,7 +1180,13 @@ io.on('connection', socket => {
         gradedCorrect: typeof player.latestAnswer.gradedCorrect === 'boolean' ? player.latestAnswer.gradedCorrect : null
       }))
       .sort((a, b) => a.elapsedMs - b.elapsedMs || a.submittedAt - b.submittedAt);
-    io.to(room.code).emit('player:answer:reveal', { answers });
+    io.to(`${room.code}:projector`).emit('player:answer:reveal', { answers });
+    cancelPlayerAnswerReveal(room);
+    room.playerAnswerRevealTimer = setTimeout(() => {
+      room.playerAnswerRevealTimer = null;
+      const playerSockets = [...room.players.values()].filter(player => player.connected).map(player => player.socketId);
+      if (playerSockets.length) io.to(playerSockets).emit('player:answer:reveal', { answers });
+    }, 1500);
     ack({ ok: true, count: answers.length });
   });
   socket.on('host:answers:grade', ({ correctAnswerIds } = {}, ack = () => {}) => {
@@ -1133,26 +1237,36 @@ io.on('connection', socket => {
   socket.on('host:answer:hide', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
-    io.to(room.code).emit('projector:answer:hide');
+    hideProjectorAnswers(room);
     ack({ ok: true });
   });
   socket.on('host:database:get', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     const obstacleCourse = { ...room.obstacleCourse, media: room.obstacleCourse.media ? { name: room.obstacleCourse.media.name, type: room.obstacleCourse.media.type, size: room.obstacleCourse.media.size } : null };
-    ack({ ok: true, questions: room.questions, introMedia: room.introMedia.map(media => media ? { name: media.name, type: media.type, size: media.size } : null), speedQuestions: room.speedQuestions.map(slot => ({ prompt: slot.prompt, answer: slot.answer, media: slot.media ? { name: slot.media.name, type: slot.media.type, size: slot.media.size } : null })), obstacleCourse, finishRounds: room.finishRounds });
+    ack({ ok: true, questions: room.questions, introMedia: room.introMedia.map(media => media ? introMediaMetadata(media) : null), speedQuestions: room.speedQuestions.map(slot => ({ prompt: slot.prompt, answer: slot.answer, media: slot.media ? { name: slot.media.name, type: slot.media.type, size: slot.media.size } : null })), obstacleCourse, finishRounds: room.finishRounds });
   });
   socket.on('host:database:intro-media:set', ({ slot, name, type, data } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     if (!Number.isInteger(slot) || slot < 0 || slot >= room.introMedia.length) return ack({ ok: false, error: 'Ô Intro không hợp lệ.' });
-    const maxSize = 30 * 1024 * 1024;
-    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > maxSize) return ack({ ok: false, error: `File media phải có dung lượng tối đa 30 MB.` });
+    const maxMegabytes = slot === 4 || slot === 7 ? 20 : 10;
+    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > maxMegabytes * 1024 * 1024) return ack({ ok: false, error: `File media phải có dung lượng tối đa ${maxMegabytes} MB.` });
     if (typeof type !== 'string' || !/^(image|video)\/[a-z0-9.+-]+$/i.test(type)) return ack({ ok: false, error: 'Chỉ hỗ trợ file ảnh hoặc video.' });
     if (typeof name !== 'string' || !name.trim() || name.length > 255) return ack({ ok: false, error: 'Tên file media không hợp lệ.' });
     const safeName = name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 255);
     room.introMedia[slot] = { name: safeName, type, size: data.length, data };
     ack({ ok: true, media: { name: safeName, type, size: data.length } });
+  });
+  socket.on('host:database:intro-media:youtube', ({ slot, url } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
+    if (!Number.isInteger(slot) || slot < 0 || slot >= 12) return ack({ ok: false, error: 'Ô media không hỗ trợ link YouTube.' });
+    const youtubeId = youtubeVideoId(url);
+    if (!youtubeId) return ack({ ok: false, error: 'Link video YouTube không hợp lệ.' });
+    const media = { name: 'YouTube', youtubeId };
+    room.introMedia[slot] = media;
+    ack({ ok: true, media });
   });
   socket.on('host:database:intro-media:get', ({ slot } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
@@ -1160,7 +1274,7 @@ io.on('connection', socket => {
     if (!Number.isInteger(slot) || slot < 0 || slot >= room.introMedia.length) return ack({ ok: false, error: 'Ô Intro không hợp lệ.' });
     const media = room.introMedia[slot];
     if (!media) return ack({ ok: false, error: 'Ô Intro chưa có media.' });
-    ack({ ok: true, media: { name: media.name, type: media.type, size: media.size, data: media.data } });
+    ack({ ok: true, media });
   });
   socket.on('host:database:intro-media:delete', ({ slot } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
@@ -1172,7 +1286,7 @@ io.on('connection', socket => {
   socket.on('host:database:obstacle-media:set', ({ name, type, data } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
-    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 30 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 30 MB.' });
+    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 10 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 10 MB.' });
     if (typeof type !== 'string' || !/^(image|video)\/[a-z0-9.+-]+$/i.test(type)) return ack({ ok: false, error: 'Chỉ hỗ trợ file ảnh hoặc video.' });
     if (typeof name !== 'string' || !name.trim() || name.length > 255) return ack({ ok: false, error: 'Tên file media không hợp lệ.' });
     const safeName = name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 255);
@@ -1243,7 +1357,7 @@ io.on('connection', socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!isDatabaseHost(room)) return ack({ ok: false, error: 'Không có quyền truy cập Database.' });
     if (!Number.isInteger(slot) || slot < 0 || slot >= room.speedQuestions.length) return ack({ ok: false, error: 'Ô Tăng tốc không hợp lệ.' });
-    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 30 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 30 MB.' });
+    if (!Buffer.isBuffer(data) || data.length === 0 || data.length > 10 * 1024 * 1024) return ack({ ok: false, error: 'File media phải có dung lượng tối đa 10 MB.' });
     if (typeof type !== 'string' || !/^(image|video)\/[a-z0-9.+-]+$/i.test(type)) return ack({ ok: false, error: 'Chỉ hỗ trợ file ảnh hoặc video.' });
     if (typeof name !== 'string' || !name.trim() || name.length > 255) return ack({ ok: false, error: 'Tên file media không hợp lệ.' });
     const safeName = name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 255);
@@ -1400,17 +1514,55 @@ io.on('connection', socket => {
     p.score = Math.max(-9999, Math.min(9999, p.score + Math.max(-100, Math.min(1000, Number(delta) || 0))));
     emitRoom(room); ack({ ok: true });
   });
+  socket.on('host:player:rename', ({ playerId, name } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    const player = room.players.get(playerId);
+    if (!player) return ack({ ok: false, error: 'Không tìm thấy thí sinh.' });
+    const newName = typeof name === 'string' ? clean(name, 24).trim() : '';
+    if (!newName) return ack({ ok: false, error: 'Tên thí sinh không được để trống.' });
+    if (newName === player.name) return ack({ ok: true });
+    player.name = newName;
+    for (const records of [room.buzzes, room.obstacleBuzzOrder, room.answers]) {
+      for (const record of records) {
+        if (record.playerId === player.id) record.name = newName;
+      }
+    }
+    emitRoom(room);
+    emitHostAnswers(room);
+    ack({ ok: true });
+  });
+  socket.on('host:player:move', ({ playerId, direction } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (direction !== -1 && direction !== 1) return ack({ ok: false, error: 'Hướng di chuyển không hợp lệ.' });
+    const order = scoreboardPlayerIds(room);
+    const visibleOrder = room.roundMode === 'bonus' ? order.filter(id => room.bonusPlayerIds?.includes(id)) : order;
+    const index = visibleOrder.indexOf(playerId);
+    if (index === -1) return ack({ ok: false, error: 'Không tìm thấy người chơi.' });
+    const targetId = visibleOrder[index + direction];
+    if (targetId) {
+      const from = order.indexOf(playerId);
+      const to = order.indexOf(targetId);
+      [order[from], order[to]] = [order[to], order[from]];
+      room.scoreboardOrder = order;
+      emitRoom(room);
+    }
+    ack({ ok: true });
+  });
   socket.on('host:remove', ({ playerId } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || socket.data.role !== 'host' || room.hostId !== socket.id) return ack({ ok: false, error: 'Không có quyền Host.' });
-    const p = room.players.get(playerId); if (p) { const s = io.sockets.sockets.get(playerId); if (s) { s.emit('player:kicked'); s.leave(room.code); s.data.roomCode = null; s.data.role = null; } room.players.delete(playerId); room.answers = room.answers.filter(a => a.playerId !== playerId); if (room.spotlightPlayerId === playerId) room.spotlightPlayerId = null; }
+    const p = room.players.get(playerId); if (p) { const s = io.sockets.sockets.get(p.socketId); if (s) { s.emit('player:kicked'); s.leave(room.code); s.data.roomCode = null; s.data.role = null; s.data.playerId = null; } room.players.delete(playerId); room.answers = room.answers.filter(a => a.playerId !== playerId); if (room.spotlightPlayerId === playerId) room.spotlightPlayerId = null; }
+    if (room.scoreboardOrder) room.scoreboardOrder = room.scoreboardOrder.filter(id => id !== playerId);
+    if (room.bonusPlayerIds) room.bonusPlayerIds = room.bonusPlayerIds.filter(id => id !== playerId);
     emitRoom(room); emitHostAnswers(room); ack({ ok: true });
   });
 
   socket.on('disconnect', () => {
     const room = rooms.get(socket.data.roomCode); if (!room) return;
     if (socket.data.role === 'player') {
-      const p = room.players.get(socket.id); if (p) { p.connected = false; p.focused = false; }
+      const p = room.players.get(socket.data.playerId); if (p?.socketId === socket.id) { p.connected = false; p.focused = false; }
       emitRoom(room);
     }
     // Host room remains available for host rejoin while the process is alive.
