@@ -500,9 +500,23 @@ $('speedQuestionSelect').addEventListener('change',async()=>{
 });
 $('openProjector').onclick=()=>{const projector=window.open(`${location.origin}/?projector=${encodeURIComponent(roomCode)}`,'_blank');if(!projector)toast('Trình duyệt đã chặn cửa sổ máy chiếu. Hãy cho phép cửa sổ bật lên rồi thử lại.');};
 function setMediaDatabaseMode(enabled){$('hostDatabase').classList.toggle('media-only',enabled);$('introMediaSlots').classList.toggle('hidden',!enabled);$('databaseViewTitle').textContent=enabled?'MEDIADATABASE':'DATABASE CÂU HỎI';$('databaseViewDescription').textContent=enabled?'Các media được lưu trong phòng thi.':'Ngân hàng câu hỏi riêng của phòng này; dữ liệu chỉ tồn tại trong phiên chạy máy chủ.';$('speedQuestionSlots').querySelectorAll('.database-speed-card h2').forEach((heading,index)=>{heading.textContent=enabled?`Media ${index+1}`:`Tăng tốc ${index+1}`;});}
-openDatabase.onclick=()=>{setMediaDatabaseMode(false);show('hostDatabase');loadDatabase();};
-$('openMedia').onclick=()=>{setMediaDatabaseMode(true);show('hostDatabase');loadDatabase();};
-closeDatabase.onclick=()=>{setMediaDatabaseMode(false);show('hostView');};
+const projectorGradientPicker=$('projectorGradientPicker');
+function syncProjectorGradientPicker(state){
+ const gradient=state?.projectorQuestionGradient??'blue';
+ projectorGradientPicker.querySelectorAll('input').forEach(input=>{input.checked=input.value===gradient;});
+}
+projectorGradientPicker.addEventListener('change',async event=>{
+ projectorGradientPicker.disabled=true;
+ try{
+  const result=await emitAck('host:projector:question-gradient',{gradient:event.target.value});
+  if(!result.ok){syncProjectorGradientPicker(latest);toast(result.error);}
+ }finally{
+  projectorGradientPicker.disabled=false;
+ }
+});
+openDatabase.onclick=()=>{projectorGradientPicker.classList.add('hidden');setMediaDatabaseMode(false);show('hostDatabase');loadDatabase();};
+$('openMedia').onclick=()=>{syncProjectorGradientPicker(latest);projectorGradientPicker.classList.remove('hidden');setMediaDatabaseMode(true);show('hostDatabase');loadDatabase();};
+closeDatabase.onclick=()=>{projectorGradientPicker.classList.add('hidden');setMediaDatabaseMode(false);show('hostView');};
 $('clearDatabase').onclick=async()=>{
  if(!confirm('Xóa toàn bộ nội dung và đáp án trong các bảng Khởi động, Vượt chướng ngại vật, Tăng tốc, Về đích và Câu hỏi phụ của phòng này?'))return;
  $('clearDatabase').disabled=true;
@@ -1036,6 +1050,7 @@ if(role==='player'){const wasAnswering=Boolean(previous&&previous.independentTim
 updateTimer();updateIndependentTimer();}
 function render(state){
  if(state){
+  if(role==='host')syncProjectorGradientPicker(state);
   if(role==='player'){
    const showWinner=state.roundMode==='opening'||state.roundMode==='finish';
    const winnerName=showWinner
@@ -1346,6 +1361,7 @@ function renderProjectorRoundScores(state){
  });
 }
 function renderProjector(state,previous){
+ $('projectorView').dataset.questionGradient=state.projectorQuestionGradient??'blue';
  renderProjectorRoundScores(state);
  syncProjectorFinishStar(state,previous);syncProjectorSummary(state);$('projectorView').classList.toggle('projector-summary-mode',state.roundMode==='summary');const playerRound=state.roundMode==='obstacle'||state.roundMode==='speed';$('projectorView').classList.toggle('projector-round-player-mode',playerRound);$('projectorQuestion').textContent=state.question||'';fitProjectorQuestion();const board=$('projectorScoreboard');board.innerHTML='';const projectorPlayerBoard=$('projectorPlayerScoreboard');projectorPlayerBoard.innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;const players=scoreboardPlayers(state);if(!players.length){const empty=document.createElement('p');empty.className='projector-empty';empty.textContent='Đang chờ thí sinh';board.append(empty);const playerEmpty=document.createElement('p');playerEmpty.className='muted';playerEmpty.textContent='Đang chờ thí sinh';projectorPlayerBoard.append(playerEmpty);}else{players.forEach(p=>{const row=document.createElement('div');row.className='projector-player';if(p.id===fastestId)row.classList.add('fastest-buzzer');const identity=document.createElement('div');identity.className='projector-player-identity';const name=document.createElement('strong');name.textContent=p.name;identity.append(name);const score=document.createElement('strong');score.className='projector-player-score';score.textContent=p.score;row.append(identity,score);board.append(row);projectorPlayerBoard.append(scoreRow(p,false,p.id===fastestId));});}scaleProjectorScoreboard();renderPlayerQuestion(state);applySpotlightClass(projectorPlayerBoard,players);}
 function fastestBuzzerId(buzzes=[]){return buzzes[0]?.playerId||null;}
@@ -1405,7 +1421,7 @@ const projectorHorizontalScoresObserver=new ResizeObserver(()=>{
 });
 projectorHorizontalScoresObserver.observe(projectorHorizontalScores);
 const playerQuestionObserver=new ResizeObserver(()=>fitPlayerQuestion());playerQuestionObserver.observe($('questionDisplay'));window.addEventListener('resize',()=>requestAnimationFrame(fitPlayerQuestion));
-function scoreRow(p,actions,highlight=false,judgeSteal=false){const row=document.createElement('div');row.className='playerrow';if(highlight||(latest?.roundMode==='obstacle'&&p.obstacleBuzzed))row.classList.add('fastest-buzzer');if(actions&&p.focused===false){row.classList.add('unfocused-player');row.title='Thí sinh đang rời khỏi trang này hoặc không focus vào trang.';}const name=document.createElement('div');name.innerHTML=`<div class="playername"><i class="${p.connected?'connected':'connected disconnected'}"></i></div><div class="playerteam"></div>`;name.querySelector('.playername').append(document.createTextNode(p.name));name.querySelector('.playerteam').textContent=p.team;const pts=document.createElement('div');pts.className='points';pts.textContent=p.score;row.append(name,pts);if(actions){const a=document.createElement('div');a.className='scoreactions';if(judgeSteal){for(const [label,correct] of [['ĐÚNG',true],['SAI',false]]){const b=document.createElement('button');b.textContent=label;b.onclick=async()=>{const result=await emitAck('host:finish:judge',{correct});if(!result.ok)toast(result.error);};a.append(b);}}const customInput=document.createElement('input');customInput.type='number';customInput.min='-100';customInput.max='1000';customInput.step='1';customInput.placeholder='Điểm';customInput.setAttribute('aria-label',`Số điểm thay đổi cho ${p.name}`);const customButton=document.createElement('button');customButton.textContent='✓';customButton.setAttribute('aria-label',`Áp dụng điểm cho ${p.name}`);customButton.title='Áp dụng số điểm đã nhập';customButton.onclick=()=>{const delta=Number(customInput.value);if(!Number.isInteger(delta)||delta< -100||delta>1000)return toast('Nhập số nguyên từ -100 đến 1000.');changeScore(p.id,delta);};a.append(customInput,customButton);const rm=document.createElement('button');rm.textContent='×';rm.title='Xóa người chơi';rm.onclick=()=>emitAck('host:remove',{playerId:p.id});a.append(rm);row.append(a);}return row;}
+function scoreRow(p,actions,highlight=false){const row=document.createElement('div');row.className='playerrow';if(highlight||(latest?.roundMode==='obstacle'&&p.obstacleBuzzed))row.classList.add('fastest-buzzer');if(actions&&p.focused===false){row.classList.add('unfocused-player');row.title='Thí sinh đang rời khỏi trang này hoặc không focus vào trang.';}const name=document.createElement('div');name.innerHTML=`<div class="playername"><i class="${p.connected?'connected':'connected disconnected'}"></i></div><div class="playerteam"></div>`;name.querySelector('.playername').append(document.createTextNode(p.name));name.querySelector('.playerteam').textContent=p.team;const pts=document.createElement('div');pts.className='points';pts.textContent=p.score;row.append(name,pts);if(actions){const a=document.createElement('div');a.className='scoreactions';const customInput=document.createElement('input');customInput.type='number';customInput.min='-100';customInput.max='1000';customInput.step='1';customInput.placeholder='Điểm';customInput.setAttribute('aria-label',`Số điểm thay đổi cho ${p.name}`);const customButton=document.createElement('button');customButton.textContent='✓';customButton.setAttribute('aria-label',`Áp dụng điểm cho ${p.name}`);customButton.title='Áp dụng số điểm đã nhập';customButton.onclick=()=>{const delta=Number(customInput.value);if(!Number.isInteger(delta)||delta< -100||delta>1000)return toast('Nhập số nguyên từ -100 đến 1000.');changeScore(p.id,delta);};a.append(customInput,customButton);const rm=document.createElement('button');rm.textContent='×';rm.title='Xóa người chơi';rm.onclick=()=>emitAck('host:remove',{playerId:p.id});a.append(rm);row.append(a);}return row;}
 async function changeScore(playerId,delta){const r=await emitAck('host:score',{playerId,delta});if(!r.ok){toast(r.error);return false;}return true;}
 async function judgeObstacleBuzzer(playerId,correct){if(!correct){const player=latest?.players?.find(item=>item.id===playerId);if(!window.confirm(`Bạn có muốn chấm sai và dừng phần thi của thí sinh ${player?.name||''} không?`))return;}let expectedPoints;if(correct){const preview=await emitAck('host:obstacle:bonus',{playerId});if(!preview.ok)return toast(preview.error);expectedPoints=preview.points;if(!window.confirm(`Bạn có muốn cộng thêm cho thí sinh này ${expectedPoints} điểm do trả lời đúng CNV không?`))return;}const result=await emitAck('host:obstacle:judge',{playerId,correct,expectedPoints});if(!result.ok){toast(result.error);return;}if(correct){for(let tile=1;tile<=5;tile++)hostObstacleRevealed.add(String(tile));hostObstacleVerdicts=Object.fromEntries([1,2,3,4,5].map(row=>[row,'Đ']));renderHostObstacleBoard();}toast(correct?`Đã cộng ${result.points} điểm CNV.`:'Đã ghi nhận thí sinh trả lời sai.');}
 $('toggleHostScoreEdit').onclick=event=>{
@@ -1422,7 +1438,7 @@ function renderHostPlayers(players,fastestId,state){
   return;
  }
  players.forEach((player,index)=>{
-  const row=scoreRow(player,true,player.id===fastestId,Boolean(state?.roundMode==='finish'&&state.finishStealPending&&fastestId===player.id));
+  const row=scoreRow(player,true,player.id===fastestId);
   const actions=row.querySelector('.scoreactions');
   const rename=document.createElement('button');
   rename.type='button';
@@ -1449,14 +1465,25 @@ function renderHostPlayers(players,fastestId,state){
    };
    actions.append(button);
   }
-  if(state?.roundMode==='obstacle'&&player.obstacleBuzzed&&!player.obstacleBuzzJudged){
+  const obstaclePending=state?.roundMode==='obstacle'&&player.obstacleBuzzed&&!player.obstacleBuzzJudged;
+  const finishPending=state?.roundMode==='finish'&&state.finishStealPending&&player.id===fastestId;
+  if(obstaclePending||finishPending){
+   const judging=document.createElement('div');
+   judging.className='score-judging';
+   judging.setAttribute('role','group');
+   judging.setAttribute('aria-label',`Chấm lượt bấm chuông của ${player.name}`);
    for(const [label,correct] of [['Đúng',true],['Sai',false]]){
     const button=document.createElement('button');
     button.type='button';
     button.textContent=label;
-    button.onclick=()=>judgeObstacleBuzzer(player.id,correct);
-    actions.append(button);
+    button.onclick=async()=>{
+     if(obstaclePending)return judgeObstacleBuzzer(player.id,correct);
+     const result=await emitAck('host:finish:judge',{correct,buzzerPlayerId:player.id});
+     if(!result.ok)toast(result.error);
+    };
+    judging.append(button);
    }
+   row.insertBefore(judging,actions);
   }
   board.append(row);
  });
