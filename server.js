@@ -265,6 +265,45 @@ io.on('connection', socket => {
     emitActiveRoundMedia(room, socket.id);
     emitProjectorObstacleAnswers(room, socket.id);
   });
+  socket.on('mc:join', ({ code: rawCode, password } = {}, ack = () => {}) => {
+    if (socket.data.role) return ack({ ok: false, error: 'Kết nối đã tham gia một phòng.' });
+    const room = rooms.get(clean(rawCode, 8).toUpperCase());
+    if (!room) return ack({ ok: false, error: 'Không tìm thấy phòng MC.' });
+    if (typeof password !== 'string' || !/^\d{6}$/.test(password)) {
+      return ack({ ok: false, error: 'Hãy nhập mật khẩu gồm 6 chữ số.' });
+    }
+    const now = Date.now();
+    if (!room.mcAttempts || room.mcAttempts.expiresAt <= now) {
+      room.mcAttempts = { count: 0, expiresAt: now + 60_000 };
+    }
+    if (room.mcAttempts.count >= 10) return ack({ ok: false, error: 'Đã thử quá nhiều lần. Hãy thử lại sau một phút.' });
+    if (password !== room.password) {
+      room.mcAttempts.count++;
+      return ack({ ok: false, error: 'Mật khẩu MC không đúng.' });
+    }
+    socket.data.roomCode = room.code;
+    socket.data.role = 'mc';
+    socket.join(room.code);
+    socket.join(`${room.code}:mc`);
+    ack({ ok: true, state: publicRoom(room), answer: room.mcAnswer || '', message: room.mcMessage || '' });
+    emitActiveRoundMedia(room, socket.id);
+  });
+  socket.on('host:mc:answer', ({ answer } = {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room) || typeof answer !== 'string' || answer.length > 5000 || answer === room.mcAnswer) return;
+    room.mcAnswer = answer;
+    io.to(`${room.code}:mc`).emit('mc:answer', answer);
+  });
+  socket.on('host:mc:message', ({ message } = {}, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Không có quyền Host.' });
+    if (typeof message !== 'string' || !message.trim() || message.length > 500) {
+      return ack({ ok: false, error: 'Tin nhắn phải có từ 1 đến 500 ký tự.' });
+    }
+    room.mcMessage = message.trim();
+    io.to(`${room.code}:mc`).emit('mc:message', room.mcMessage);
+    ack({ ok: true });
+  });
   socket.on('host:create', ({ hostName, duration, teams } = {}, ack = () => {}) => {
     if (socket.data.role) return ack({ ok: false, error: 'Kết nối đã tham gia một phòng.' });
     let roomCode; do { roomCode = code(); } while (rooms.has(roomCode));
@@ -297,7 +336,7 @@ io.on('connection', socket => {
       previousHost.emit('host:replaced');
     }
     room.hostId = socket.id; socket.join(room.code); socket.data.roomCode = room.code; socket.data.role = 'host';
-    ack({ ok: true, password: room.password, state: publicRoom(room), answers: room.answers, activeSpeedQuestionSlot: room.activeSpeedQuestionSlot });
+    ack({ ok: true, password: room.password, state: publicRoom(room), answers: room.answers, activeSpeedQuestionSlot: room.activeSpeedQuestionSlot, mcAnswer: room.mcAnswer });
     emitActiveRoundMedia(room, socket.id);
   });
   socket.on('host:database:token', (_payload, ack = () => {}) => {
@@ -326,6 +365,7 @@ io.on('connection', socket => {
     socket.data.role = 'player';
     socket.data.playerId = player.id;
     socket.join(room.code);
+    socket.join(`${room.code}:players`);
   }
 
   socket.on('player:join', ({ code: rawCode, name, team } = {}, ack = () => {}) => {
@@ -774,12 +814,29 @@ io.on('connection', socket => {
     const media = room.introMedia[slot];
     if (!media) return ack({ ok: false, error: 'Chưa có media trong MediaDatabase.' });
     io.to(`${room.code}:projector`).emit('projector:overlay:media', media);
+    room.playerOverlayActive = slot === 5 || slot === 6;
+    room.playerOverlaySound = false;
+    if (room.playerOverlayActive) io.to(`${room.code}:players`).emit('player:overlay:media', media);
+    else io.to(`${room.code}:players`).emit('player:overlay:close');
+    io.to(room.code).emit('overlay:player-sound', false);
+    ack({ ok: true });
+  });
+  socket.on('host:overlay:player-sound', (_payload, ack = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!isHost(room)) return ack({ ok: false, error: 'Host access required.' });
+    if (!room.playerOverlayActive) return ack({ ok: false, error: 'Hãy phát VidVD1 hoặc VidVD2 trước.' });
+    room.playerOverlaySound = !room.playerOverlaySound;
+    io.to(room.code).emit('overlay:player-sound', room.playerOverlaySound);
     ack({ ok: true });
   });
   socket.on('host:overlay:close', (_payload, ack = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!isHost(room)) return ack({ ok: false, error: 'Host access required.' });
     io.to(`${room.code}:projector`).emit('projector:overlay:close');
+    room.playerOverlayActive = false;
+    room.playerOverlaySound = false;
+    io.to(`${room.code}:players`).emit('player:overlay:close');
+    io.to(room.code).emit('overlay:player-sound', false);
     ack({ ok: true });
   });
   socket.on('host:intro:play', ({ slot } = {}, ack = () => {}) => {
