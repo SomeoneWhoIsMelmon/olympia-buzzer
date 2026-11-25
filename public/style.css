@@ -700,10 +700,10 @@ body,body.player-active{background:#000040;}
 .projector-finish-exiting :is(.projector-question-panel,.projector-score-panel,.projector-horizontal-scores){animation:projector-opening-exit .8s cubic-bezier(.4,0,1,1) 1s both;}
 .projector-finish-start-graphic{position:absolute;top:calc(50vh - clamp(90px,13vw,176px) - clamp(45px,6.5vw,88px) - clamp(8px,1.7vh,18px));right:4vw;z-index:6;display:flex;width:max-content;flex-direction:column;gap:clamp(8px,1.7vh,18px);overflow:visible;}
 .projector-finish-point-row{--finish-marker-gap:clamp(8px,1.3vw,18px);display:flex;width:100%;align-items:center;justify-content:flex-end;gap:var(--finish-marker-gap);overflow:visible;}
-.projector-finish-point-tile{position:relative;z-index:2;display:grid;width:clamp(90px,13vw,176px);aspect-ratio:1;flex:none;place-items:center;border:4px solid #fff;background:#000040;color:#fff;font-size:clamp(42px,7vw,90px);font-style:italic;line-height:1;}
+.projector-finish-point-tile{position:relative;z-index:2;display:grid;width:clamp(90px,13vw,176px);aspect-ratio:1;flex:none;place-items:center;border:4px solid #fff;background:var(--projector-question-bg,#000040);color:#fff;font-size:clamp(42px,7vw,90px);font-style:italic;line-height:1;}
 .projector-finish-point-tile.is-disabled-hidden{visibility:hidden;}
 .projector-finish-question-markers{--marker-size:clamp(20px,3.4vw,44px);position:relative;z-index:1;display:flex;width:0;flex:none;flex-direction:column;justify-content:center;gap:clamp(5px,1.7vh,18px);overflow:visible;}
-.projector-finish-question-markers span{display:block;width:var(--marker-size);aspect-ratio:1;flex:none;border:4px solid #fff;background:#000040;}
+.projector-finish-question-markers span{display:block;width:var(--marker-size);aspect-ratio:1;flex:none;border:4px solid #fff;background:var(--projector-question-bg,#000040);}
 .projector-finish-question-markers span.is-selected{border-color:#ff3b3b;background:#e00000;box-shadow:0 0 12px 5px #e00000;}
 .projector-finish-starting .projector-finish-point-tile{animation:projector-finish-points-in .8s cubic-bezier(0,0,.2,1) 4.5s both;}
 .projector-finish-starting .projector-finish-question-markers{animation:projector-finish-marker-slot-in .8s cubic-bezier(0,0,.2,1) 5.5s both;}
