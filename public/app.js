@@ -1429,7 +1429,9 @@ function renderProjectorRoundScores(state){
  });
 }
 function renderProjector(state,previous){
- $('projectorView').dataset.questionGradient=state.projectorQuestionGradient??'blue';
+ const gradient=state.projectorQuestionGradient??'blue';
+ $('projectorView').dataset.questionGradient=gradient;
+ $('answerRevealDialog').dataset.questionGradient=gradient;
  renderProjectorRoundScores(state);
  syncProjectorFinishStar(state,previous);syncProjectorSummary(state);$('projectorView').classList.toggle('projector-summary-mode',state.roundMode==='summary');const playerRound=state.roundMode==='obstacle'||state.roundMode==='speed';$('projectorView').classList.toggle('projector-round-player-mode',playerRound);$('projectorQuestion').textContent=state.question||'';fitProjectorQuestion();const board=$('projectorScoreboard');board.innerHTML='';const projectorPlayerBoard=$('projectorPlayerScoreboard');projectorPlayerBoard.innerHTML='';const fastestId=state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId;const players=scoreboardPlayers(state);if(!players.length){const empty=document.createElement('p');empty.className='projector-empty';empty.textContent='Đang chờ thí sinh';board.append(empty);const playerEmpty=document.createElement('p');playerEmpty.className='muted';playerEmpty.textContent='Đang chờ thí sinh';projectorPlayerBoard.append(playerEmpty);}else{players.forEach(p=>{const row=document.createElement('div');row.className='projector-player';if(p.id===fastestId)row.classList.add('fastest-buzzer');const identity=document.createElement('div');identity.className='projector-player-identity';const name=document.createElement('strong');name.textContent=p.name;identity.append(name);const score=document.createElement('strong');score.className='projector-player-score';score.textContent=p.score;row.append(identity,score);board.append(row);projectorPlayerBoard.append(scoreRow(p,false,p.id===fastestId));});}scaleProjectorScoreboard();renderPlayerQuestion(state);applySpotlightClass(projectorPlayerBoard,players);}
 function fastestBuzzerId(buzzes=[]){return buzzes[0]?.playerId||null;}
