@@ -1390,7 +1390,7 @@ function syncSpeedMediaPlayback(now){
  const duration=timer.duration*1000;
  const active=timer.running&&started&&now<timer.deadline;
  const resumed=timer.running?timer.deadline-timer.startedAt<duration:timer.remainingMs<duration;
- element?.classList.toggle('hidden',!started&&!resumed);
+ element?.classList.toggle('hidden',element instanceof HTMLVideoElement&&!started&&!resumed);
  if(timer.running&&!started&&connected){
   if(!load.startHandle||load.scheduledAt!==timer.startedAt){
    clearTimeout(load.startHandle);

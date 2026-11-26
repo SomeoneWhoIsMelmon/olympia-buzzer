@@ -3,7 +3,7 @@
 <body><main class="shell"><header><div class="brand">OLYMPIA <span>ETDAPLIU</span></div><div class="sub">HỆ THỐNG BẤM CHUÔNG TRỰC TUYẾN</div></header>
 <section id="home" class="panel"><h1>Bắt đầu trận đấu</h1><p class="muted">Tạo phòng với tư cách Host hoặc tham gia bằng mã phòng.</p><div class="homegrid"><button class="primary" id="goHost">TẠO PHÒNG HOST</button><button class="secondary" id="goPlayer">THAM GIA PHÒNG</button></div></section>
 <section id="hostSetup" class="panel hidden"><button class="back" data-back>← Quay lại</button><h2>Thiết lập phòng</h2><label>Tên Host<input id="hostName" value="Host Olympia" maxlength="24"></label><label>Tên các đội (mỗi dòng một đội)<textarea id="teams" rows="3">Đội 1
-Đội 2</textarea></label><label>Mật khẩu mùa giải "Tân Xuân 2027":<input id="seasonPassword" type="password" inputmode="numeric" autocomplete="off" maxlength="6" required></label><button class="primary wide" id="createRoom">TẠO PHÒNG</button></section>
+Đội 2</textarea></label><label>Mật khẩu mùa giải "Tân Xuân 2027":<input id="seasonPassword" type="password" autocomplete="off" maxlength="20" required></label><button class="primary wide" id="createRoom">TẠO PHÒNG</button></section>
 <section id="playerSetup" class="panel hidden"><button class="back" data-back>← Quay lại</button><h2>Tham gia trận đấu</h2><label>Mã phòng<input id="joinCode" maxlength="8" placeholder="VD: A1B2C3" autocomplete="off"></label><label>Tên người chơi<input id="playerName" maxlength="24" placeholder="Tên của bạn"></label><label>Đội<select id="playerTeam"><option value="">Đợi tải danh sách đội…</option></select></label><button class="primary wide" id="joinRoom">THAM GIA</button></section>
 <section id="mcSetup" class="panel hidden">
   <h2>Vào màn MC</h2>
