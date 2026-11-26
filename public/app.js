@@ -1422,6 +1422,7 @@ function renderPlayerQuestion(state){
  if(!projector)renderPlayerObstacleBoard(state);
  display.classList.toggle('round-media-active',Boolean(media?.url));
  text.textContent=state.question||'';
+ if(projector&&media?.url)requestAnimationFrame(fitProjectorSpeedLayout);
  if(!projector)requestAnimationFrame(fitPlayerQuestion);
  container.classList.toggle('hidden',!media?.url);
  if(!media){
@@ -1634,6 +1635,18 @@ document.fonts.load('500 27px "Barlow Condensed"').then(()=>{
  fitPlayerQuestion();
 }).catch(error=>console.warn('Could not load Barlow Condensed:',error));
 function fitProjectorQuestion(){fitQuestionText($('projectorQuestion'));}
+function fitProjectorSpeedLayout(){
+ const layout=$('projectorPlayerQuestion');
+ if(!layout.classList.contains('round-media-active')||!layout.clientHeight)return;
+ const question=$('projectorPlayerQuestionText');
+ const media=$('projectorPlayerQuestionMedia').parentElement;
+ const width=Math.max(question.offsetWidth,media.offsetWidth);
+ const height=question.offsetHeight+media.offsetHeight+parseFloat(getComputedStyle(layout).rowGap);
+ if(width>0&&height>0)layout.style.setProperty('--speed-layout-scale',Math.min(1,layout.clientWidth/width,layout.clientHeight/height));
+}
+const speedLayoutObserver=new ResizeObserver(fitProjectorSpeedLayout);
+speedLayoutObserver.observe($('projectorPlayerQuestion'));
+speedLayoutObserver.observe($('projectorPlayerQuestionText'));
 function fitPlayerQuestion(){fitQuestionText($('questionDisplayText'),$('questionDisplay').classList.contains('player-obstacle-active')?$('playerQuestionTextArea'):$('questionDisplay'),false);}
 function scaleProjectorScoreboard(){if(!$('projectorView')||$('projectorView').classList.contains('hidden'))return;const panel=document.querySelector('.projector-score-panel'),board=$('projectorScoreboard');if(!panel||!board)return;const players=board.querySelectorAll('.projector-player');if(!players.length){board.style.setProperty('--projector-rows','1');board.style.setProperty('--projector-scale','1');return;}const rowHeight=board.clientHeight/players.length,scale=Math.max(.15,Math.min(1,rowHeight/148.5,board.clientWidth/607.5));board.style.setProperty('--projector-rows',String(players.length));board.style.setProperty('--projector-scale',String(scale));}
 const projectorObserver=new ResizeObserver(()=>{scaleProjectorScoreboard();fitProjectorQuestion();});projectorObserver.observe(document.querySelector('.projector-score-panel'));projectorObserver.observe(document.querySelector('.projector-question-panel'));window.addEventListener('resize',()=>{scaleProjectorScoreboard();fitProjectorQuestion();});
