@@ -219,6 +219,14 @@ body,body.player-active{background:#000040;}
 }
 .host-active .host-clock .answer-reveal-trigger{grid-column:1/-1;background:#000040;}
 .host-active .host-clock .answer-reveal-trigger.is-answer-reveal-open{background:#000020;}
+.host-active .host-clock:has(.speed-readiness:not(.hidden)){overflow:auto;}
+.speed-readiness{flex:none;margin-top:6px;padding-top:5px;border-top:1px solid #ffffff50;font-size:11px;line-height:1.3;}
+.speed-readiness p{margin:0;font-weight:800;}
+.speed-readiness ul{display:flex;flex-wrap:wrap;gap:3px 8px;margin:3px 0 0;padding:0;list-style:none;}
+.speed-readiness li{display:flex;flex-wrap:wrap;gap:3px;max-width:100%;overflow-wrap:anywhere;}
+.speed-readiness li[data-status=ready] span{color:#a8f5bf;}
+.speed-readiness li[data-status=loading] span{color:#ffe59b;}
+.speed-readiness li[data-status=error] span,.speed-readiness li[data-status=disconnected] span{color:#ffc1c7;}
 .answer-reveal-dialog{width:min(90vw,760px);max-width:none;max-height:90vh;padding:0;border:4px solid #fff;border-radius:0;background:#000040;color:#fff;text-align:center;}
 .answer-reveal-dialog::backdrop{background:#000b;}
 .answer-reveal-content{display:flex;max-height:90vh;flex-direction:column;padding:clamp(16px,4vw,32px);}
@@ -288,7 +296,7 @@ body,body.player-active{background:#000040;}
  .host-active .host-round-buttons{justify-content:flex-end;}
  .host-active .host-top-actions .host-round-buttons button{padding:5px 7px;font-size:11px;}
 }
-.projector-active{width:100vw;height:100vh;height:100dvh;overflow:hidden;background:#000 url('/DoHoa/Background.jpg') center/cover no-repeat;color:#fff;}
+.projector-active{width:100vw;height:100vh;height:100dvh;overflow:hidden;background:#000 url('/DoHoa/Background.b22500473581.webp') center/cover no-repeat;color:#fff;}
 .projector-active .shell{width:100%;height:100%;max-width:none;margin:0;padding:0;}
 .projector-active header,.projector-active footer{display:none;}
 .projector-page{--projector-player-tint:rgb(255 255 255 / 12%);position:fixed;inset:0;overflow:hidden;background:transparent;color:#fff;}
@@ -342,8 +350,8 @@ body,body.player-active{background:#000040;}
 .projector-obstacle-view{position:absolute;inset:0;z-index:1;grid-template-rows:minmax(0,1.35fr) minmax(0,.7fr);align-items:stretch;gap:clamp(24px,6vh,64px);padding:7vh 6vw 6vh;background:transparent;color:#fff;}
 .projector-obstacle-picture{--frame-width:clamp(12px,2.7vw,48px);position:absolute;top:50%;left:50%;width:min(80vw,142.22vh,calc(100vh * 16 / 9 - 2 * var(--frame-width) * 16 / 9 - 16px));aspect-ratio:16/9;transform:translate(-50%,-50%) scale(.9);z-index:3;overflow:visible;background:#000040;border:0;}
 /* The frame sits outside the 16:9 image, beneath the puzzle pieces. */
-.projector-obstacle-picture::before{content:"";position:absolute;inset:calc(-1 * var(--frame-width));z-index:3;padding:var(--frame-width);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;border:0;background:#eee9df url("/images/birch-bark-realistic.png") repeat;background-size:360px 360px;box-shadow:0 8px 20px #0006;pointer-events:none;}
-.projector-obstacle-picture::after{content:"";position:absolute;inset:calc(-1 * var(--frame-width) - 22px);z-index:4;background:url("/images/ivy-green-realistic.png") center / 100% 100% no-repeat;filter:sepia(1) saturate(2.2) hue-rotate(-10deg) brightness(1.4);pointer-events:none;}
+.projector-obstacle-picture::before{content:"";position:absolute;inset:calc(-1 * var(--frame-width));z-index:3;padding:var(--frame-width);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;border:0;background:#eee9df url("/images/birch-bark-realistic.426bdc38f5e7.webp") repeat;background-size:360px 360px;box-shadow:0 8px 20px #0006;pointer-events:none;}
+.projector-obstacle-picture::after{content:"";position:absolute;inset:calc(-1 * var(--frame-width) - 22px);z-index:4;background:url("/images/ivy-green-realistic.3d56c4686efc.webp") center / 100% 100% no-repeat;filter:sepia(1) saturate(2.2) hue-rotate(-10deg) brightness(1.4);pointer-events:none;}
 .projector-obstacle-buzzes{position:absolute;left:0;top:27vh;z-index:5;display:flex;width:clamp(86px,11vw,210px);max-height:68vh;flex-direction:column;gap:2px;overflow:auto;}
 .projector-obstacle-buzz-entry{box-sizing:border-box;flex:none;height:clamp(39px,4.2vh,48px);overflow:hidden;padding:2px 4px;border:3px solid #fff;background:#e00000;color:#fff;text-align:center;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(10px,1.3vw,18px);font-style:italic;font-weight:900;}
 .projector-obstacle-picture>img,.projector-obstacle-picture>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
@@ -725,17 +733,20 @@ body,body.player-active{background:#000040;}
 .projector-active .projector-page,.projector-active .projector-page *{font-family:Arial,sans-serif!important;font-weight:700!important;}
 #projectorView.projector-opening-individual-spotlight .projector-player.spotlight-player{background:#738cff!important;border-color:#aebcff!important;color:#fff!important;}
 .player-active.player-opening-individual-spotlight .player-score-panel .playerrow.spotlight-player{background:#738cff!important;border-color:#aebcff!important;color:#fff!important;}
-.projector-speed-mode .projector-player-layout{grid-template-columns:minmax(0,1fr);}
+.projector-speed-mode .projector-player-layout{grid-template-columns:minmax(0,1fr);container-type:size;}
 .projector-speed-mode .projector-score-stack{display:none;}
 .projector-speed-media-pending .projector-player-layout .question-display{visibility:hidden;}
 .projector-speed-question-hidden #projectorPlayerQuestionText{transform:translateX(-110vw);opacity:0;}
 .projector-speed-question-hidden .projector-speed-media-area{transform:translateX(110vw);opacity:0;}
 .projector-speed-question-entering #projectorPlayerQuestionText{animation:projector-speed-question-in .8s cubic-bezier(0,0,.2,1) both;}
 .projector-speed-question-entering .projector-speed-media-area{animation:projector-speed-media-in .8s cubic-bezier(0,0,.2,1) both;}
-.projector-speed-mode .projector-player-layout .question-display.round-media-active{box-sizing:border-box;grid-template-rows:12% 85%;gap:3%;padding:0;border:0;background:transparent;}
-.projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-text{box-sizing:border-box;width:100%;padding:clamp(8px,1vw,14px);border:4px solid #fff;background:var(--projector-dark-question-bg,#000040);}
+.projector-speed-mode .projector-player-layout .question-display.round-media-active{--speed-media-height:85cqh;--speed-media-width:calc(var(--speed-media-height) * 16 / 9);box-sizing:border-box;grid-template-columns:minmax(0,1fr);grid-template-rows:12% var(--speed-media-height);gap:3%;padding:0;border:0;background:transparent;}
+.projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-text{display:block;align-content:safe center;justify-self:center;box-sizing:border-box;width:var(--speed-media-width);padding:clamp(8px,1vw,14px);overflow:auto;border:4px solid #fff;background:var(--projector-dark-question-bg,#000040);}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-media{box-sizing:border-box;width:100%;border:4px solid #fff;background:var(--projector-question-bg,#000040);}
+.projector-speed-media-slot{display:contents;}
+.projector-speed-mode .question-display.round-media-active .projector-speed-media-slot{display:grid;grid-template-columns:minmax(0,1fr);place-items:center;min-width:0;min-height:0;}
 .projector-speed-media-area{position:relative;width:100%;height:100%;min-width:0;min-height:0;}
+.projector-speed-mode .question-display.round-media-active .projector-speed-media-area{width:var(--speed-media-width);height:var(--speed-media-height);aspect-ratio:16 / 9;}
 .projector-speed-answer-overlay{position:absolute;inset:0;z-index:2;box-sizing:border-box;width:100%;height:100%;object-fit:contain;border:4px solid #fff;background:var(--projector-question-bg,#000040);}
 .projector-speed-media-area .question-display-media{height:100%;}
 .projector-speed-question-timer-box{position:absolute;right:clamp(10px,2vw,24px);bottom:clamp(10px,2vw,24px);z-index:3;pointer-events:none;}
@@ -789,7 +800,7 @@ body,body.player-active{background:#000040;}
 .player-overlay-youtube{pointer-events:none;}
 
 .host-active #greenScreen.is-active{background:#00ff00;color:#000040;}
-.projector-active.projector-green-screen{background:#00ff00;}
+.projector-active.projector-green-screen .projector-page{background-color:#00ff00;}
 
 .projector-obstacle-green-question .projector-obstacle-rows{visibility:hidden;}
 
