@@ -728,18 +728,16 @@ body,body.player-active{background:#000040;}
 @keyframes projector-opening-exit{from{transform:translateY(0);}to{transform:translateY(110vh);}}
 @keyframes projector-obstacle-question-in{from{transform:translateY(110vh);}to{transform:translateY(0);}}
 @keyframes projector-obstacle-question-out{from{transform:translateY(0);}to{transform:translateY(110vh);}}
-@keyframes projector-speed-question-in{from{transform:translateX(-110vw);}to{transform:translateX(0);}}
-@keyframes projector-speed-media-in{from{transform:translateX(110vw);}to{transform:translateX(0);}}
 .projector-active .projector-page,.projector-active .projector-page *{font-family:Arial,sans-serif!important;font-weight:700!important;}
 #projectorView.projector-opening-individual-spotlight .projector-player.spotlight-player{background:#738cff!important;border-color:#aebcff!important;color:#fff!important;}
 .player-active.player-opening-individual-spotlight .player-score-panel .playerrow.spotlight-player{background:#738cff!important;border-color:#aebcff!important;color:#fff!important;}
 .projector-speed-mode .projector-player-layout{grid-template-columns:minmax(0,1fr);container-type:size;}
 .projector-speed-mode .projector-score-stack{display:none;}
-.projector-speed-media-pending .projector-player-layout .question-display{visibility:hidden;}
-.projector-speed-question-hidden #projectorPlayerQuestionText{transform:translateX(-110vw);opacity:0;}
-.projector-speed-question-hidden .projector-speed-media-area{transform:translateX(110vw);opacity:0;}
-.projector-speed-question-entering #projectorPlayerQuestionText{animation:projector-speed-question-in .8s cubic-bezier(0,0,.2,1) both;}
-.projector-speed-question-entering .projector-speed-media-area{animation:projector-speed-media-in .8s cubic-bezier(0,0,.2,1) both;}
+.speed-question-waiting :is(.question-display-text,.question-display-media,.projector-speed-media-area){visibility:hidden;}
+.speed-question-waiting .speed-media-retry{visibility:visible;}
+.projector-speed-mode .speed-question-entering .question-display-text{animation:speed-question-slide-in .8s cubic-bezier(0,0,.2,1) both;--speed-question-offset:-110vw;}
+.projector-speed-mode .speed-question-entering .projector-speed-media-area{animation:speed-question-slide-in .8s cubic-bezier(0,0,.2,1) both;--speed-question-offset:110vw;}
+@keyframes speed-question-slide-in{from{transform:translateX(var(--speed-question-offset));}to{transform:translateX(0);}}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active{--speed-media-height:85cqh;--speed-media-width:calc(var(--speed-media-height) * 16 / 9);box-sizing:border-box;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(12%,max-content) var(--speed-media-height);gap:3%;align-content:start;transform:scale(var(--speed-layout-scale,1));transform-origin:top center;padding:0;border:0;background:transparent;}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-text{display:block;align-content:safe center;justify-self:center;box-sizing:border-box;width:var(--speed-media-width);padding:clamp(8px,1vw,14px);overflow:visible;border:4px solid #fff;background:var(--projector-dark-question-bg,#000040);}
 .projector-speed-mode .projector-player-layout .question-display.round-media-active .question-display-media{box-sizing:border-box;width:100%;border:4px solid #fff;background:var(--projector-question-bg,#000040);}

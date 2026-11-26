@@ -88,7 +88,20 @@ function publicRoom(room) {
     teams: room.teams, answerCount: room.answers.length, independentTimer: { duration: room.independentTimer.duration, running: room.independentTimer.running, deadline: room.independentTimer.deadline, remainingMs: independentTimeRemaining(room.independentTimer), startedAt: room.independentTimer.startedAt }
   };
 }
-function emitRoom(room) { io.to(room.code).emit('room:update', publicRoom(room)); }
+function emitRoom(room) {
+  const state = publicRoom(room);
+  const question = state.speedQuestion;
+  const now = Date.now();
+  if (question && room.speedQuestion.media && (!question.questionRevealAt || question.questionRevealAt > now)) {
+    question.questionRevealAt = question.contestantsReady ? question.questionRevealAt || now + 500 : null;
+    room.speedQuestion.questionRevealAt = question.questionRevealAt;
+  }
+  if (question && room.speedQuestion.media && (!question.readyAt || question.readyAt > now)) {
+    question.readyAt = question.ready ? question.readyAt || now + 500 : null;
+    room.speedQuestion.readyAt = question.readyAt;
+  }
+  io.to(room.code).emit('room:update', state);
+}
 function bonusAudio(room, playing) {
   io.to(`${room.code}:projector`).emit('projector:bonus:audio', { playing, offset: (15000 - (room.bonusRemainingMs ?? 15000)) / 1000 });
 }
@@ -173,7 +186,9 @@ function speedQuestionState(room) {
     status: projectorIds[index] ? status(projectorIds[index]) : 'disconnected'
   }));
   const devices = [...players, ...projectors];
-  return { id: question.id, devices, ready: devices.length > 0 && devices.every(device => device.status === 'ready') };
+  const ready = devices.length > 0 && devices.every(device => device.status === 'ready');
+  const contestantsReady = players.length ? players.every(player => player.status === 'ready') : ready;
+  return { id: question.id, readyAt: question.readyAt ?? null, questionRevealAt: question.questionRevealAt ?? null, devices, ready, contestantsReady };
 }
 function independentTimeRemaining(timer, now = Date.now()) {
   return timer.running ? Math.max(0, Math.min(timer.remainingMs, timer.deadline - now)) : timer.remainingMs;

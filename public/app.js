@@ -11,8 +11,6 @@ let role = null, roomCode = null, myId = null, latest = null, hostLink = null, a
 let finishRounds = Array.from({length:4},()=>Array.from({length:7},()=>({question:'',answer:''})));
 let projectorIntroMediaObjectUrl = null;
 let projectorObstacleQuestionTimeout = null;
-let projectorSpeedQuestionTimeout = null;
-let projectorSpeedMediaReady = false, projectorSpeedQuestionRequested = false;
 let projectorObstacleVerdicts = {}, projectorObstacleMediaObjectUrl = null;
 let hostObstacleRevealed = new Set(), hostObstacleMediaObjectUrl = null, hostObstacleRowSelected = null, hostObstacleVerdicts = {};
 let selectedHostAnswerIds = new Set(), gradedHostAnswers = new Map();
@@ -70,11 +68,6 @@ function clearProjectorObstacleQuestionTimeout(){if(projectorObstacleQuestionTim
 function hideProjectorObstacleQuestion(animated=true){if(role!=='projector')return;clearProjectorObstacleQuestionTimeout();const view=$('projectorView'),question=$('projectorObstacleQuestion').parentElement;if(view.classList.contains('projector-obstacle-question-hidden'))return;view.classList.remove('projector-obstacle-question-entering','projector-obstacle-question-exiting');if(!animated){view.classList.add('projector-obstacle-question-hidden');return;}void question.offsetWidth;view.classList.add('projector-obstacle-question-exiting');projectorObstacleQuestionTimeout=setTimeout(()=>{view.classList.remove('projector-obstacle-question-exiting');view.classList.add('projector-obstacle-question-hidden');projectorObstacleQuestionTimeout=null;},800);}
 function scheduleProjectorObstacleQuestionEntrance(){if(role!=='projector'||latest?.roundMode!=='obstacle'||!latest.obstacleStarted)return;const view=$('projectorView');if(!view.classList.contains('projector-obstacle-question-hidden')&&!view.classList.contains('projector-obstacle-question-exiting'))return;clearProjectorObstacleQuestionTimeout();projectorObstacleQuestionTimeout=setTimeout(()=>{view.classList.remove('projector-obstacle-question-hidden','projector-obstacle-question-exiting');void $('projectorObstacleQuestion').parentElement.offsetWidth;view.classList.add('projector-obstacle-question-entering');projectorObstacleQuestionTimeout=setTimeout(()=>{view.classList.remove('projector-obstacle-question-entering');projectorObstacleQuestionTimeout=null;},800);},2000);}
 function syncProjectorObstacleQuestionPresentation(state,previous){const view=$('projectorView'),obstacle=state.roundMode==='obstacle',started=obstacle&&Boolean(state.obstacleStarted);if(!started){clearProjectorObstacleQuestionTimeout();view.classList.remove('projector-obstacle-question-entering','projector-obstacle-question-exiting','projector-obstacle-question-hidden');return;}if(!previous||previous.roundMode!=='obstacle'||!previous.obstacleStarted){clearProjectorObstacleQuestionTimeout();view.classList.remove('projector-obstacle-question-entering','projector-obstacle-question-exiting');view.classList.add('projector-obstacle-question-hidden');}}
-function clearProjectorSpeedQuestionTimeout(){if(projectorSpeedQuestionTimeout){clearTimeout(projectorSpeedQuestionTimeout);projectorSpeedQuestionTimeout=null;}}
-function syncProjectorSpeedQuestionPresentation(state,previous){const view=$('projectorView');if(state.roundMode!=='speed'){clearProjectorSpeedQuestionTimeout();projectorSpeedMediaReady=false;projectorSpeedQuestionRequested=false;view.classList.remove('projector-speed-question-hidden','projector-speed-question-entering','projector-speed-media-pending');return;}if(!previous||previous.roundMode!=='speed'||state.speedQuestion?.id!==previous.speedQuestion?.id){clearProjectorSpeedQuestionTimeout();projectorSpeedMediaReady=false;projectorSpeedQuestionRequested=false;view.classList.remove('projector-speed-question-entering');view.classList.add('projector-speed-question-hidden','projector-speed-media-pending');}}
-function animateProjectorSpeedQuestion(){if(role!=='projector'||latest?.roundMode!=='speed'||!projectorSpeedMediaReady)return;const view=$('projectorView'),question=$('projectorPlayerQuestionText'),media=$('projectorPlayerQuestionMedia').parentElement;clearProjectorSpeedQuestionTimeout();view.classList.remove('projector-speed-question-entering');view.classList.add('projector-speed-question-hidden');void question.offsetWidth;void media.offsetWidth;view.classList.remove('projector-speed-question-hidden','projector-speed-media-pending');view.classList.add('projector-speed-question-entering');projectorSpeedQuestionTimeout=setTimeout(()=>{view.classList.remove('projector-speed-question-entering');projectorSpeedQuestionTimeout=null;},800);}
-function showProjectorSpeedQuestion(){if(role!=='projector'||latest?.roundMode!=='speed')return;projectorSpeedQuestionRequested=true;if(!projectorSpeedMediaReady){$('projectorView').classList.add('projector-speed-question-hidden','projector-speed-media-pending');return;}animateProjectorSpeedQuestion();}
-function markProjectorSpeedMediaReady(element){if(role!=='projector'||latest?.roundMode!=='speed'||$('projectorPlayerQuestionMedia').firstElementChild!==element)return;projectorSpeedMediaReady=true;$('projectorView').classList.remove('projector-speed-media-pending');if(projectorSpeedQuestionRequested)animateProjectorSpeedQuestion();}
 function startProjectorFinishEntrance(){
  if(role!=='projector')return;
  const view=$('projectorView');
@@ -935,8 +928,6 @@ $('openSpeedQuestion').onclick=async({currentTarget:button})=>{
   activeSpeedQuestionSlot=slotIndex;
   setHostAnswerNote(slot.answer||'');
   selectedHostAnswerIds.clear();gradedHostAnswers.clear();resetAnswerRevealControl();
-  const audioResult=await socket.timeout(5000).emitWithAck('host:opening:audio',{type:'speedQuestionOpen'});
-  if(!audioResult.ok)toast(audioResult.error);
  }catch{
   toast('Không nhận được phản hồi khi mở câu hỏi Tăng tốc.');
  }finally{
@@ -1185,12 +1176,12 @@ function renderAnswers(answers=[]){const latestByPlayer=new Map();for(const answ
 function renderBuzzes(buzzes=[]){if(!$('hostBuzzes'))return;$('buzzCount').textContent=`${buzzes.length} lượt`;$('hostBuzzes').innerHTML='';if(!buzzes.length){$('hostBuzzes').innerHTML='<p class="muted">Chưa có thí sinh bấm chuông.</p>';return;}[...buzzes].sort((a,b)=>a.elapsedMs-b.elapsedMs).forEach((b,i)=>{const card=document.createElement('article');card.className='answercard';const top=document.createElement('div');top.className='answercardtop';const who=document.createElement('strong');who.textContent=`${i+1}. ${b.name} · ${b.team}`;const time=document.createElement('time');time.textContent=formatElapsed(b.elapsedMs);top.append(who,time);card.append(top);$('hostBuzzes').append(card);});}
 function queueNewProjectorBuzzes(state,previous){if(role!=='projector'||!previous)return;if(state.roundMode==='bonus'){if(previous.roundMode==='bonus'){const oldBuzzIds=new Set((previous.buzzes||[]).map(buzz=>buzz.id));for(const buzz of state.buzzes||[])if(!oldBuzzIds.has(buzz.id))queueProjectorBuzz();}return;}if(state.roundMode==='obstacle'){if(previous.roundMode==='obstacle'){const oldBuzzIds=new Set((previous.buzzes||[]).map(buzz=>buzz.id));for(const buzz of state.buzzes||[])if(!oldBuzzIds.has(buzz.id))queueProjectorAudio('buzzCNV');}return;}if(state.buzzerAlwaysOpen&&!(previous.buzzes||[]).length&&(state.buzzes||[]).length)queueProjectorBuzz();else if(!state.buzzerAlwaysOpen&&!previous.buzzerAlwaysOpen&&state.winnerId&&state.winnerId!==previous.winnerId)queueProjectorBuzz();}
 function renderProjectorObstacleBuzzes(state){const panel=$('projectorObstacleBuzzes'),buzzes=state.obstacleBuzzOrder||[];panel.replaceChildren();panel.classList.toggle('hidden',!buzzes.length);buzzes.forEach(buzz=>{const entry=document.createElement('div');entry.className='projector-obstacle-buzz-entry';entry.textContent=buzz.name;entry.title=buzz.name;panel.append(entry);});}
-socket.on('projector:audio',({type}={})=>{if(role!=='projector')return;if(type==='stopAllSFX'){stopAllProjectorSfx();return;}if(type==='start')startProjectorOpeningEntrance();if(type==='end')startProjectorOpeningExit();if(type==='startVDCombined')showProjectorFinishStartGraphic();if(type==='speedQuestionOpen')showProjectorSpeedQuestion();if(type==='showAnswerVCNV'&&latest?.roundMode==='obstacle')hideProjectorObstacleQuestion();if(['correct','wrong','start','end','opening','blank','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT',...Object.keys(finishAudioFiles),...Object.keys(hostCueAudioFiles)].includes(type))queueProjectorAudio(type);});
+socket.on('projector:audio',({type}={})=>{if(role!=='projector')return;if(type==='stopAllSFX'){stopAllProjectorSfx();return;}if(type==='start')startProjectorOpeningEntrance();if(type==='end')startProjectorOpeningExit();if(type==='startVDCombined')showProjectorFinishStartGraphic();if(type==='showAnswerVCNV'&&latest?.roundMode==='obstacle')hideProjectorObstacleQuestion();if(['correct','wrong','start','end','opening','blank','vcnv15','tt20','tt30','tt40','speedQuestionOpen','showAnswerVCNV','showAnswerTT',...Object.keys(finishAudioFiles),...Object.keys(hostCueAudioFiles)].includes(type))queueProjectorAudio(type);});
 socket.on('projector:finish:presentation',({action}={})=>{if(role!=='projector')return;if(action==='commit'){startProjectorFinishEntrance();scheduleProjectorFinishStartGraphicExit();}if(action==='end'){startProjectorFinishExit();hideProjectorFinishStartGraphic();}});
 socket.on('projector:obstacle:answers',({rows,verdicts}={})=>{if(role!=='projector'||!Array.isArray(rows))return;projectorObstacleAnswerCells=Array.from({length:4},(_,row)=>Array.from({length:15},(_,cell)=>String(rows[row]?.[cell]||'')));projectorObstacleVerdicts=verdicts&&typeof verdicts==='object'?verdicts:{};if(latest?.roundMode==='obstacle')renderProjectorObstacle(latest);});
 socket.on('projector:obstacle:verdict',({row,verdict}={})=>{if(role!=='projector'||!Number.isInteger(row))return;projectorObstacleVerdicts[row]=verdict;if(verdict==='S')hideProjectorObstacleQuestion();if(latest?.roundMode==='obstacle')renderProjectorObstacle(latest);});
 socket.on('projector:obstacle:question-presentation',({action}={})=>{if(role==='projector'&&action==='show')scheduleProjectorObstacleQuestionEntrance();});
-function renderBase(state){const previous=latest;if(!state)return;queueNewProjectorBuzzes(state,previous);latest=state;if(role==='player')syncPlayerAuxiliaryVisibility();if(role==='host'&&$('finishNshv')){$('finishNshv').classList.toggle('finish-nshv-active',Boolean(state.finishNshv));$('finishNshv').setAttribute('aria-pressed',String(Boolean(state.finishNshv)));}if(Number.isFinite(state.projectorVolume))setProjectorVolume(state.projectorVolume);if(role==='projector')syncProjectorOpeningMusic(state);if(role==='host'&&!$('hostQuestionInput').matches(':focus'))$('hostQuestionInput').value=state.question||'';if(role==='projector'){syncProjectorObstacleQuestionPresentation(state,previous);syncProjectorSpeedQuestionPresentation(state,previous);renderProjector(state,previous);updateTimer();return;}const names={waiting:'ĐANG CHỜ',playing:'CHUÔNG ĐANG MỞ',won:'ĐÃ CÓ NGƯỜI BẤM',locked:'ĐÃ KHÓA',timeout:'HẾT THỜI GIAN'};const winner=state.players.find(p=>p.id===state.winnerId);
+function renderBase(state){const previous=latest;if(!state)return;queueNewProjectorBuzzes(state,previous);latest=state;if(role==='player')syncPlayerAuxiliaryVisibility();if(role==='host'&&$('finishNshv')){$('finishNshv').classList.toggle('finish-nshv-active',Boolean(state.finishNshv));$('finishNshv').setAttribute('aria-pressed',String(Boolean(state.finishNshv)));}if(Number.isFinite(state.projectorVolume))setProjectorVolume(state.projectorVolume);if(role==='projector')syncProjectorOpeningMusic(state);if(role==='host'&&!$('hostQuestionInput').matches(':focus'))$('hostQuestionInput').value=state.question||'';if(role==='projector'){syncProjectorObstacleQuestionPresentation(state,previous);renderProjector(state,previous);updateTimer();return;}const names={waiting:'ĐANG CHỜ',playing:'CHUÔNG ĐANG MỞ',won:'ĐÃ CÓ NGƯỜI BẤM',locked:'ĐÃ KHÓA',timeout:'HẾT THỜI GIAN'};const winner=state.players.find(p=>p.id===state.winnerId);
 if(role==='host'){$('hostStatus').textContent=names[state.status]||state.status;$('hostStatus').className='status '+(state.status==='playing'?'live':state.status==='won'?'won':'');$('hostWinner').classList.add('hidden');$('hostWinner').textContent='';$('alwaysOpen').checked=Boolean(state.buzzerAlwaysOpen);const players=scoreboardPlayers(state);$('playerCount').textContent=`${players.length} người`;renderHostPlayers(players,state.buzzerAlwaysOpen?fastestBuzzerId(state.buzzes):state.winnerId,state);renderBuzzes(state.buzzes||[]);$('startRoundDelayed').disabled=Boolean(state.buzzerCountdownDeadline);}
  if(role==='player'){
   if(state.roundMode==='speed'){
@@ -1306,6 +1297,7 @@ function clearSpeedMedia(){
  const load=speedMediaLoad;
  if(!load)return;
  speedMediaLoad=null;
+ if(role==='projector')$('projectorPlayerQuestion').classList.remove('speed-question-entering');
  clearTimeout(load.startHandle);
  load.controller?.abort();
  if(load.element instanceof HTMLVideoElement)load.element.pause();
@@ -1323,10 +1315,6 @@ function reportSpeedMediaStatus(){
 function markSpeedMediaReady(load){
  if(speedMediaLoad!==load||load.status!=='loading')return;
  load.status='ready';
- if(role==='projector'){
-  markProjectorSpeedMediaReady(load.element);
-  if(!projectorSpeedQuestionRequested&&latest?.question)showProjectorSpeedQuestion();
- }
  reportSpeedMediaStatus();
  updateIndependentTimer();
 }
@@ -1341,15 +1329,13 @@ async function loadSpeedQuestionMedia(container,media){
  }
  load.controller=new AbortController();
  container.textContent='Đang tải media…';
- if(role==='projector')$('projectorView').classList.add('projector-speed-media-pending');
  reportSpeedMediaStatus();
  load.fail=()=>{
   if(speedMediaLoad!==load)return;
   load.status='error';
-  if(role==='projector')$('projectorView').classList.remove('projector-speed-media-pending','projector-speed-question-hidden');
   const retry=document.createElement('button');
   retry.type='button';
-  retry.className='secondary';
+  retry.className='secondary speed-media-retry';
   retry.textContent='Tải lại media';
   retry.onclick=()=>loadSpeedQuestionMedia(container,media);
   container.replaceChildren(retry);
@@ -1390,12 +1376,24 @@ function syncSpeedMediaPlayback(now){
  const duration=timer.duration*1000;
  const active=timer.running&&started&&now<timer.deadline;
  const resumed=timer.running?timer.deadline-timer.startedAt<duration:timer.remainingMs<duration;
- element?.classList.toggle('hidden',element instanceof HTMLVideoElement&&!started&&!resumed);
- if(timer.running&&!started&&connected){
-  if(!load.startHandle||load.scheduledAt!==timer.startedAt){
+ const readyAt=latest.speedQuestion.readyAt;
+ const isImage=activeRoundMedia?.type?.startsWith('image/');
+ const questionRevealAt=latest.speedQuestion.questionRevealAt;
+ const questionVisible=connected&&(activeRoundMedia?.url?questionRevealAt&&now>=questionRevealAt:started||resumed);
+ const mediaVisible=questionVisible&&(isImage||started||resumed);
+ $(role==='projector'?'projectorPlayerQuestion':'questionDisplay').classList.toggle('speed-question-waiting',!questionVisible);
+ element?.classList.toggle('hidden',!mediaVisible);
+ if(role==='projector')$('projectorPlayerQuestion').classList.toggle('speed-question-entering',Boolean(activeRoundMedia?.url&&questionVisible));
+ if(role==='projector'&&connected&&readyAt&&now>=readyAt&&!load.openCuePlayed){
+  load.openCuePlayed=true;
+  if(now-readyAt<500)queueProjectorAudio('speedQuestionOpen');
+ }
+ const wakeAt=Math.min(readyAt>now?readyAt:Infinity,questionRevealAt>now?questionRevealAt:Infinity,timer.running&&timer.startedAt>now?timer.startedAt:Infinity);
+ if(Number.isFinite(wakeAt)&&connected){
+  if(!load.startHandle||load.scheduledAt!==wakeAt){
    clearTimeout(load.startHandle);
-   load.scheduledAt=timer.startedAt;
-   load.startHandle=setTimeout(()=>{load.startHandle=null;updateIndependentTimer();},Math.ceil(timer.startedAt-now));
+   load.scheduledAt=wakeAt;
+   load.startHandle=setTimeout(()=>{load.startHandle=null;updateIndependentTimer();},Math.ceil(wakeAt-now));
   }
  }else{
   clearTimeout(load.startHandle);
@@ -1421,6 +1419,7 @@ function renderPlayerQuestion(state){
  const media=state.speedQuestion?.id&&state.speedQuestion.id===activeRoundMedia?.id?activeRoundMedia:null;
  if(!projector)renderPlayerObstacleBoard(state);
  display.classList.toggle('round-media-active',Boolean(media?.url));
+ display.classList.toggle('speed-question-waiting',state.roundMode==='speed');
  text.textContent=state.question||'';
  if(projector&&media?.url)requestAnimationFrame(fitProjectorSpeedLayout);
  if(!projector)requestAnimationFrame(fitPlayerQuestion);
@@ -1432,6 +1431,7 @@ function renderPlayerQuestion(state){
  }
  if(speedMediaLoad?.id!==media.id)loadSpeedQuestionMedia(container,media);
  else reportSpeedMediaStatus();
+ syncSpeedMediaPlayback(displayNow());
 }
 function hideProjectorIntroMedia(){const container=$('projectorIntroMedia');if(!container)return;container.querySelector('video')?.pause();container.replaceChildren();container.classList.add('hidden');container.setAttribute('aria-hidden','true');if(projectorIntroMediaObjectUrl){URL.revokeObjectURL(projectorIntroMediaObjectUrl);projectorIntroMediaObjectUrl=null;}}
 socket.on('projector:intro:media',media=>{
@@ -1467,10 +1467,8 @@ socket.on('round:media',media=>{
   return;
  }
  if(!['player','projector','mc'].includes(role))return;
- const newMedia=media?.id!==activeRoundMedia?.id;
  activeRoundMedia=media?.id?{...media,connectionId:socket.id}:media&&typeof media.data!=='undefined'?media:null;
  activeRoundMediaVersion++;
- if(newMedia&&role==='projector'&&latest?.roundMode==='speed'){projectorSpeedMediaReady=false;$('projectorView').classList.add('projector-speed-media-pending','projector-speed-question-hidden');}
  if(latest){renderPlayerQuestion(latest);if(role==='projector'&&latest.roundMode==='obstacle')renderProjectorObstacle(latest);}
 });
 socket.on('host:database:questions:update',questions=>{
